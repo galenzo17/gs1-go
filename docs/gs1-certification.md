@@ -1,0 +1,151 @@
+# GS1 solution-provider certification matrix
+
+This document maps every item of the GS1 LATAM solution-provider
+certification checklist to the state of this library. It is the source of
+truth for the [GS1 certification readiness milestone](https://github.com/galenzo17/gs1-go/milestone/1)
+and the tracking issue [#22](https://github.com/galenzo17/gs1-go/issues/22).
+
+The checklist audits a complete solution: an application plus the parsing
+layer it is built on. This module is only the parsing and validation layer
+(see [ADR 0002](adr/0002-parser-scope.md)), so each row states who owns the
+requirement.
+
+## Status legend
+
+| Status | Meaning |
+|---|---|
+| **Covered** | Implemented and tested in this module. |
+| **Gap** | Belongs to this module and is missing or partial. Linked issue tracks it. |
+| **Application layer** | Belongs to the application built on top of the module. The library provides the data; the integration guide (#20) documents how to use it. |
+| **Out of scope** | Not addressed by this module or by its documentation. Pointers to GS1 resources are given. |
+
+Type follows the checklist: Required, Recommended, Optional.
+
+## 1. GS1 keys and Application Identifiers
+
+The checklist asks that every key is accepted with its length, data type and,
+where applicable, check digit validated.
+
+| # | Item | AI | Type | Status | Notes / issue |
+|---|---|---|---|---|---|
+| 1.1 | GTIN-13 for trade items | 01, 02 | Required | Covered, check digit opt-in | Length and numeric type validated on parse. Check digit via `ValidateGTIN`; strict parse mode in #6. |
+| 1.2 | GTIN-14 at case level | 01, 02 | Required | Covered, check digit opt-in | Same as 1.1. |
+| 1.3 | GTIN-12 (UPC-A) | 01, 02 | Required | Covered, check digit opt-in | Bare 12-digit input zero-padded to GTIN-14. |
+| 1.4 | GTIN-8 (EAN-8) | 01, 02 | Required | Gap | As AI (01) data it parses. Bare 8-digit input is rejected as ambiguous; fixed by symbology identifiers in #15. |
+| 1.5 | Batch/lot, alphanumeric up to 20 | 10 | Required | Covered | `Lot()`. |
+| 1.6 | Expiration date YYMMDD | 17 | Required | Covered; (12) gap | `ExpirationDate()`. The auditor's note about AI (12) being accepted with a warning is #9. |
+| 1.7 | Production date | 11 | Required | Covered | `ProductionDate()`. |
+| 1.8 | Packaging date | 13 | Required | Covered, accessor gap | Parses; typed accessor in #12. |
+| 1.9 | Best before date | 15 | Required | Covered | `BestBeforeDate()`. |
+| 1.10 | SSCC, 17 digits + check | 00 | Required | Gap | Parses and `SSCC()` exposes it. No check-digit validation (#7) and no builder for self-assigned sequential SSCCs (#17). |
+| 1.11 | Net weight kg, 6 digits | 310n | Required | Gap | Parses as raw string. Implied decimal point not applied (#11). |
+| 1.12 | Gross weight kg | 330n | Required | Gap | Same as 1.11. |
+| 1.13 | Net weight lb | 320n | Required | Gap | Same as 1.11. |
+| 1.14 | Gross weight lb | 340n | Required | Gap | Same as 1.11. |
+| 1.15 | Count, up to 8 digits | 37 | Required | Covered, accessor gap | Parses; `CountOfTradeItems()` in #12. |
+| 1.16 | GLN, 12 digits + check | 414 | Required | Gap | Parses (414). Check digit (#7), rest of GLN family 410–417 (#10), accessor (#12). |
+| 1.17 | Customer part number | 241 | Required | Covered | |
+| 1.18 | Serial number | 21 | Required | Covered | `SerialNumber()`. |
+| 1.19 | GSIN, 16 digits + check | 402 | Required | Gap | Parses. Check digit (#7), accessor (#12). |
+| 1.20 | Internal AIs 90–99 | 90–99 | Required | Covered | 90 is X..30, 91–99 are X..90. |
+| 1.21 | GDTI | 253 | Recommended | Gap | Not in table (#8). |
+| 1.22 | GRAI | 8003 | Recommended | Gap | Not in table (#8). |
+| 1.23 | GIAI | 8004 | Recommended | Gap | Not in table (#8). |
+| 1.24 | GSRN | 8018 | Recommended | Gap | Not in table; 8017 added alongside (#8). |
+| 1.25 | GINC | 401 | Recommended | Gap | Not in table (#8). |
+
+Cross-cutting: the module knows 56 AIs. Any other AI fails with
+`ErrUnknownAI`. Generating the full table from the GS1 Syntax Dictionary
+(#14) closes this for every future audit, and association rules between AIs
+such as (02) with (37) are tracked in #13.
+
+## 2. Symbologies
+
+The module never touches pixels or bars. It consumes what the scanner
+decodes, so "supports symbology X" means: accepts the decoded string, with
+or without its AIM symbology identifier, and splits it correctly.
+
+| # | Item | Type | Status | Notes / issue |
+|---|---|---|---|---|
+| 2.1 | EAN-13 | Required | Covered, prefix gap | Bare 13 digits parse. `]E0` prefix is not recognised (#15). |
+| 2.2 | ITF-14 | Required | Gap | Bare 14 digits parse. `]I0` prefix is not recognised and the carrier is not reported (#15). |
+| 2.3 | GS1-128 with its AIs | Required | Covered | `]C1`, FNC1 as ASCII 29, missing-FNC1 recovery. |
+| 2.4 | GS1 DataMatrix with its AIs | Required | Covered | `]d1`, `]d2`. |
+| 2.5 | GS1 DataBar family | Required | Covered | `]e0`. Decodes to the same element string as GS1-128. |
+| 2.6 | EAN-8 | Required | Gap | See 1.4 and #15. |
+| 2.7 | UPC-A | Required | Covered, prefix gap | See 2.1. |
+| 2.8 | UPC-E | Required | Covered | `ExpandUPCE`. Automatic expansion under `]E0` in #15. |
+| 2.9 | GS1 QR Code | Recommended | Covered | `]Q3`. |
+| 2.10 | EPC / RFID tag | Recommended | Gap | EPC Tag Data Standard decoding proposed in #19. |
+
+Printing symbols (checklist wording "impresión") is covered under 3.5.
+
+## 3. Reading and processing Application Identifiers
+
+| # | Item | Type | Status | Notes / issue |
+|---|---|---|---|---|
+| 3.1 | Compatible with Wi-Fi data capture devices (mobile computers, not only tethered scanners) | Required | Application layer | The parser is transport-agnostic: HID text, TCP streams and HTTP posts all feed `ParseInto`. Documented in the integration guide (#20). |
+| 3.2 | Read and process AIs: split and store internally | Required | Covered, rules gap | Elements in scan order, `Get`, typed accessors. Association rules (#13) and full table (#14) harden it. |
+| 3.3 | Separate and store each AI as its own field, e.g. (02) GTIN, (10) lot, (17) expiry, (37) count | Required | Covered | `Barcode.Elements` plus accessors. Dates return `time.Time`. |
+| 3.4 | Place, manage and interpret FNC1 after variable-length AIs | Required | Covered | Reading side complete. Writing side (placing FNC1 when building strings) is the encoder in #16. |
+| 3.5 | Print, read and interpret 2D symbologies; print simple and logistic labels | Required | Gap (data) + Application layer (rendering) | Reading is covered. Building the element string with correct AI order and FNC1 placement, plus HRI text, is #16. Rendering the symbol belongs to the application with a barcode generator library. |
+| 3.6 | Samples and logistic labels validated with the local GS1 verifier | Required | Gap (data) + Application layer (print quality) | Data conformance against GS1 Syntax Engine vectors is #18. Physical verification (ISO/IEC 15415/15416) requires printed samples and the GS1 member organisation's verifier. |
+
+## 4. Reports compatible with global standards
+
+All rows belong to the application. The library's job is to hand over
+normalised keys so the application can store, filter and print them.
+
+| # | Item | Type | Status | Notes / issue |
+|---|---|---|---|---|
+| 4.1 | Reports show GS1 keys across the product hierarchy | Required | Application layer | Hierarchy SSCC → (02)+(37) → item GTIN. Builders in #17, guide in #20. |
+| 4.2 | GS1 keys as primary identifiers on dispatch notes, purchase orders, invoices | Required | Application layer | Store GTIN-14 canonical form from `GTIN()`. Guide in #20. |
+| 4.3 | Reports filtered by GTIN, lot, dates, serial, SSCC | Required | Application layer | Recommended column set in #20. |
+| 4.4 | Generate, send or receive a packing list with SSCC, GTIN-14, lot, dates, GTIN-13, quantities | Required | Application layer | Mapping to GS1 XML DespatchAdvice / EANCOM DESADV in #20. |
+| 4.5 | Ingest a received packing list without manual typing | Required | Application layer | Same mapping in reverse; parser handles the barcode side, EDI handles the document side. |
+
+## 5. EDI-GS1 compatibility (second phase)
+
+Out of scope for this module. The integration guide (#20) includes a
+pointer table so auditors can see where each item lives in a complete
+solution.
+
+| # | Item | Type | Status |
+|---|---|---|---|
+| 5.1 | WebService transport | Optional | Out of scope |
+| 5.2 | AS2 | Optional | Out of scope |
+| 5.3 | AS4 | Optional | Out of scope |
+| 5.4 | VAN | Optional | Out of scope |
+| 5.5 | webEDI | Optional | Out of scope |
+| 5.6 | GS1 XML 3.2 / EANCOM syntax 4 concepts | Optional | Out of scope |
+| 5.7 | GDSN catalogue synchronisation | Optional | Out of scope |
+| A–L | EDI documents: ORDERS, INVOIC, RECADV, DESADV, ORDCHG, RETANN, CONTRL, APERAK, REMADV, ORDRSP, RETINS, PRICAT | Optional (RECADV, DESADV Recommended) | Out of scope |
+
+Reference implementations: GS1 XML 3.x schemas and EANCOM at
+<https://www.gs1.org/standards/edi>, GDSN at <https://www.gs1.org/services/gdsn>.
+
+## Summary
+
+| Section | Required rows | Covered | Gap | Application layer / out of scope |
+|---|---|---|---|---|
+| 1. Keys | 20 | 9 | 11 | 0 |
+| 2. Symbologies | 8 | 5 | 3 | 0 |
+| 3. Processing | 6 | 3 | 2 | 1 |
+| 4. Reports | 5 | 0 | 0 | 5 |
+| 5. EDI | 0 | 0 | 0 | all |
+
+Rows counted as "Covered" include those where only a convenience accessor or
+opt-in strictness is pending. Rows in "Gap" have a linked issue in the
+milestone. When every Required gap is closed and the conformance job in #18
+is green, the module side of the checklist is complete; the remaining rows
+are demonstrated by the application during the audit using the integration
+guide.
+
+## Working with the milestone
+
+- Issues carry `gs1-certification` plus a `priority:` label mirroring the
+  checklist type and an `area:` label for the code they touch.
+- `application-layer` marks items the module documents but does not
+  implement.
+- Update this file in the same pull request that closes an issue, so the
+  matrix never lags the code.
