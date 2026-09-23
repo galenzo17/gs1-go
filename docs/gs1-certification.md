@@ -43,7 +43,7 @@ where applicable, check digit validated.
 | 1.13 | Net weight lb | 320n | Required | Gap | Same as 1.11. |
 | 1.14 | Gross weight lb | 340n | Required | Gap | Same as 1.11. |
 | 1.15 | Count, up to 8 digits | 37 | Required | Covered, accessor gap | Parses; `CountOfTradeItems()` in #12. |
-| 1.16 | GLN, 12 digits + check | 414 | Required | Gap | Parses (414). Check digit (#7), rest of GLN family 410–417 (#10), accessor (#12). |
+| 1.16 | GLN, 12 digits + check | 414 | Required | Covered, check digit gap | Whole GLN family parses: 410–417, 254 and 7040 landed in #27 (closes #10). Check digit (#7), accessor (#12). |
 | 1.17 | Customer part number | 241 | Required | Covered | |
 | 1.18 | Serial number | 21 | Required | Covered | `SerialNumber()`. |
 | 1.19 | GSIN, 16 digits + check | 402 | Required | Gap | Parses. Check digit (#7), accessor (#12). |
@@ -54,7 +54,7 @@ where applicable, check digit validated.
 | 1.24 | GSRN | 8018 | Recommended | Gap | Not in table; 8017 added alongside (#8). |
 | 1.25 | GINC | 401 | Recommended | Gap | Not in table (#8). |
 
-Cross-cutting: the module knows 56 AIs. Any other AI fails with
+Cross-cutting: the module knows 63 AIs. Any other AI fails with
 `ErrUnknownAI`. Generating the full table from the GS1 Syntax Dictionary
 (#14) closes this for every future audit, and association rules between AIs
 such as (02) with (37) are tracked in #13.
@@ -128,7 +128,7 @@ Reference implementations: GS1 XML 3.x schemas and EANCOM at
 
 | Section | Required rows | Covered | Gap | Application layer / out of scope |
 |---|---|---|---|---|
-| 1. Keys | 20 | 9 | 11 | 0 |
+| 1. Keys | 20 | 10 | 10 | 0 |
 | 2. Symbologies | 8 | 5 | 3 | 0 |
 | 3. Processing | 6 | 3 | 2 | 1 |
 | 4. Reports | 5 | 0 | 0 | 5 |
@@ -141,11 +141,13 @@ is green, the module side of the checklist is complete; the remaining rows
 are demonstrated by the application during the audit using the integration
 guide.
 
+## Keeping this file current
+
+Last reviewed: 2026-09-23, after #27 merged. Update this file in the same pull request that closes an issue, so the matrix never lags the code.
+
 ## Working with the milestone
 
 - Issues carry `gs1-certification` plus a `priority:` label mirroring the
   checklist type and an `area:` label for the code they touch.
 - `application-layer` marks items the module documents but does not
   implement.
-- Update this file in the same pull request that closes an issue, so the
-  matrix never lags the code.
