@@ -14,6 +14,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - Identification AIs 253, 401, 8003, 8004, 8017 and 8018, with `GDTI()` and
   `GRAI()` accessors.
 - Missing-FNC1 recovery coverage for mixed-format identification AIs.
+- `Measure` and typed barcode measurement accessors for net and gross weight.
+- Measurement data in CLI JSON output.
 
 ### Changed
 

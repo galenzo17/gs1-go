@@ -26,6 +26,34 @@ func TestParseText(t *testing.T) {
 	}
 }
 
+func TestParseWeightText(t *testing.T) {
+	code, out, _ := exec(t, "", "parse", "3102001250")
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	if !strings.Contains(out, "12.50 kg") {
+		t.Errorf("output = %q, want formatted weight", out)
+	}
+}
+
+func TestParseWeightJSON(t *testing.T) {
+	code, out, _ := exec(t, "", "parse", "-json", "3405001250")
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	var got parseOutput
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out)
+	}
+	if len(got.Elements) != 1 || got.Elements[0].Measure == nil {
+		t.Fatalf("elements = %+v, want one measured element", got.Elements)
+	}
+	measure := got.Elements[0].Measure
+	if measure.Raw != "001250" || measure.Value != 0.0125 || measure.Unit != "lb" {
+		t.Errorf("measure = %+v, want raw 001250, value 0.0125, unit lb", measure)
+	}
+}
+
 func TestParseJSONWithISODates(t *testing.T) {
 	code, out, _ := exec(t, "", "parse", "-json", "-iso", "010415000002112617250200020415000002112613250601")
 	if code != 0 {

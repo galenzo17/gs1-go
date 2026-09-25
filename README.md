@@ -75,7 +75,7 @@ go install github.com/galenzo17/gs1-go/cmd/gs1@latest
 elements in scan order and offers typed accessors for the common healthcare AIs.
 
 ```go
-b, err := gs1.Parse("(01)04150000021126(17)250630(10)ABC123")
+b, err := gs1.Parse("(01)04150000021126(3102)001234(17)250630(10)ABC123")
 if err != nil {
     log.Fatal(err)
 }
@@ -85,10 +85,22 @@ for _, e := range b.Elements {
     fmt.Printf("(%s) %-16s %s\n", e.AI, ai.Name, e.Value)
 }
 // (01) GTIN             04150000021126
+// (3102) Net Weight kg    001234
 // (17) Expiration Date  250630
 // (10) Batch/Lot        ABC123
 
 v, ok := b.Get("17") // generic lookup, first occurrence
+```
+
+Weight AIs expose their implied decimal point through typed measurements. The
+raw and scaled forms remain available when an exact decimal representation is
+needed:
+
+```go
+weight, ok := b.NetWeightKg() // AI 310n
+if ok {
+    fmt.Printf("%.2f %s (raw %s)\n", weight.Value, weight.Unit, weight.Raw)
+}
 ```
 
 Errors wrap sentinel values so callers can branch with `errors.Is`:
