@@ -505,6 +505,83 @@ func TestParseConvenienceMethodsMissing(t *testing.T) {
 	}
 }
 
+func TestDueDateWarning(t *testing.T) {
+	b, err := Parse("12250630")
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	due, err := b.DueDate()
+	if err != nil {
+		t.Fatalf("DueDate() error = %v", err)
+	}
+	if !due.Equal(time.Date(2025, 6, 30, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("DueDate() = %v, want 2025-06-30", due)
+	}
+	if got := b.Warnings(); len(got) != 1 || got[0].Code != WarnDueDateAsExpiry {
+		t.Errorf("Warnings() = %+v, want one %q warning", got, WarnDueDateAsExpiry)
+	}
+	if _, err := b.ExpirationDate(); err == nil {
+		t.Error("ExpirationDate() should still require AI (17)")
+	}
+}
+
+func TestBareGTINWithKnownAIPrefix(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"UPC-A", "123456789012", "00123456789012"},
+		{"EAN-13", "1234567890128", "01234567890128"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b, err := Parse(tt.input)
+			if err != nil {
+				t.Fatalf("Parse() error = %v", err)
+			}
+			if len(b.Elements) != 1 || b.Elements[0].AI != "01" || b.Elements[0].Value != tt.want {
+				t.Fatalf("Parse() elements = %+v, want AI 01 value %q", b.Elements, tt.want)
+			}
+			if got := b.Warnings(); len(got) != 0 {
+				t.Fatalf("Parse() warnings = %+v, want none", got)
+			}
+
+			var reused Barcode
+			if err := ParseInto(tt.input, &reused); err != nil {
+				t.Fatalf("ParseInto() error = %v", err)
+			}
+			if len(reused.Elements) != 1 || reused.Elements[0].AI != "01" || reused.Elements[0].Value != tt.want {
+				t.Fatalf("ParseInto() elements = %+v, want AI 01 value %q", reused.Elements, tt.want)
+			}
+			if got := reused.Warnings(); len(got) != 0 {
+				t.Fatalf("ParseInto() warnings = %+v, want none", got)
+			}
+		})
+	}
+}
+
+func TestDueDateWithExpirationHasNoWarning(t *testing.T) {
+	b, err := Parse("1225063017250630")
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if got := b.Warnings(); len(got) != 0 {
+		t.Errorf("Warnings() = %+v, want none", got)
+	}
+}
+
+func TestExpirationDateWithoutDueDateHasNoWarning(t *testing.T) {
+	b, err := Parse("17250630")
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if got := b.Warnings(); len(got) != 0 {
+		t.Errorf("Warnings() = %+v, want none", got)
+	}
+}
+
 func TestValidateAssociations(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -593,16 +670,22 @@ func TestMissingFNC1DoesNotTreatEmbeddedTextAsMixedIdentifier(t *testing.T) {
 }
 
 func TestBarcodeReset(t *testing.T) {
-	b, err := Parse("0104150000021126172506302112345ABC\x1D10LOT42X")
+	b, err := Parse("12250630")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(b.Elements) != 4 {
-		t.Fatalf("got %d elements, want 4", len(b.Elements))
+	if len(b.Elements) != 1 {
+		t.Fatalf("got %d elements, want 1", len(b.Elements))
+	}
+	if got := b.Warnings(); len(got) != 1 || got[0].Code != WarnDueDateAsExpiry {
+		t.Fatalf("Warnings() before Reset() = %+v, want one %q warning", got, WarnDueDateAsExpiry)
 	}
 	origCap := cap(b.Elements)
 
 	b.Reset()
+	if got := b.Warnings(); len(got) != 0 {
+		t.Errorf("Warnings() after Reset() = %+v, want empty", got)
+	}
 
 	if b.Raw != "" {
 		t.Errorf("Raw = %q after Reset, want empty", b.Raw)

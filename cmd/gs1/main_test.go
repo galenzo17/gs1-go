@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	gs1 "github.com/galenzo17/gs1-go"
 )
 
 func exec(t *testing.T, stdin string, args ...string) (code int, stdout, stderr string) {
@@ -59,6 +61,23 @@ func TestParseJSONIncludesTypedAccessors(t *testing.T) {
 	}
 	if got.ContentGTIN != "04150000021126" || got.CountOfTradeItems != "42" || got.GLN != "1234567890123" || got.GSIN != "12345678901234567" || got.PackagingDate != "250601" {
 		t.Errorf("typed accessors = %+v", got)
+	}
+}
+
+func TestParseDueDateWarning(t *testing.T) {
+	code, out, errOut := exec(t, "", "parse", "-json", "12250630")
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	var got parseOutput
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out)
+	}
+	if len(got.Warnings) != 1 || got.Warnings[0].Code != gs1.WarnDueDateAsExpiry {
+		t.Errorf("warnings = %+v", got.Warnings)
+	}
+	if !strings.Contains(errOut, "AI (12) is a due date") {
+		t.Errorf("stderr = %q", errOut)
 	}
 }
 

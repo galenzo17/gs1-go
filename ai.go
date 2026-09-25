@@ -36,6 +36,7 @@ var aiTable = map[string]aiSpec{
 
 	// Dates (YYMMDD)
 	"11": {AI: "11", Name: "Production Date", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
+	"12": {AI: "12", Name: "Due Date", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
 	"13": {AI: "13", Name: "Packaging Date", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
 	"15": {AI: "15", Name: "Best Before Date", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
 	"17": {AI: "17", Name: "Expiration Date", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},

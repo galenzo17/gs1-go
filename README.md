@@ -177,6 +177,10 @@ t, _ = gs1.ParseDateWithOptions("250200",
 raw, _ := gs1.ParseDateRaw("250630")                              // "250630", validated
 ```
 
+`Barcode.DueDate()` parses AI 12 and adds a `WarnDueDateAsExpiry` warning when
+AI 17 is absent. Inspect `Barcode.Warnings()` to surface that advisory; the
+CLI and WebAssembly JSON output expose the same warnings.
+
 ### Regulatory profiles
 
 Check that a barcode carries the AIs a national regulator mandates for
@@ -209,6 +213,7 @@ Formats use GS1 Syntax Dictionary notation: `N14` is exactly 14 digits,
 | 02 | Content GTIN | N14 |
 | 10 | Batch/Lot | X..20 |
 | 11 | Production Date | N6 |
+| 12 | Due Date | N6 |
 | 13 | Packaging Date | N6 |
 | 15 | Best Before Date | N6 |
 | 17 | Expiration Date | N6 |
@@ -291,6 +296,7 @@ make wasm   # produces wasm/gs1.wasm and a servable example under wasm/example/
   const r = gs1.parse("0104150000021126172502001012345", { dateFormat: "iso", dayZero: "first" });
   r.gtin;            // "04150000021126"
   r.expirationDate;  // "2025-02-01"
+  r.warnings;         // parser advisories such as due-date-as-expiry
 
   gs1.validateGTIN("04150000021126");            // true
   gs1.validateRegulatory(scan, "anvisa");       // null when compliant, else message

@@ -4,6 +4,12 @@ export interface GS1Element {
   value: string;
 }
 
+/** A non-fatal parsing advisory. */
+export interface GS1Warning {
+  code: string;
+  message: string;
+}
+
 /** Result of parsing a GS1 barcode string. */
 export interface GS1ParseResult {
   raw: string;
@@ -21,6 +27,8 @@ export interface GS1ParseResult {
   gsin?: string;
   /** Packaging date (AI 13). Raw YYMMDD or ISO 8601 depending on dateFormat. */
   packagingDate?: string;
+  /** Non-fatal parsing advisories. */
+  warnings?: GS1Warning[];
   /** Expiration date (AI 17). Raw YYMMDD or ISO 8601 depending on dateFormat. */
   expirationDate?: string;
   /** Production date (AI 11). Raw YYMMDD or ISO 8601 depending on dateFormat. */

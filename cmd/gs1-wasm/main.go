@@ -28,6 +28,7 @@ type parseResultJSON struct {
 	ExpirationDate    string        `json:"expirationDate,omitempty"`
 	ProductionDate    string        `json:"productionDate,omitempty"`
 	BestBeforeDate    string        `json:"bestBeforeDate,omitempty"`
+	Warnings          []gs1.Warning `json:"warnings,omitempty"`
 }
 
 // dateAIs are the AI codes that contain YYMMDD dates.
@@ -79,6 +80,7 @@ func parse(_ js.Value, args []js.Value) any {
 		GLN:               b.GLN(),
 		GSIN:              b.GSIN(),
 		PackagingDate:     "",
+		Warnings:          b.Warnings(),
 	}
 	for i, e := range b.Elements {
 		result.Elements[i] = elementJSON{AI: e.AI, Value: e.Value}
