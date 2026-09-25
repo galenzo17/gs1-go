@@ -36,6 +36,8 @@ b.GSIN() // "12345678901234567"
 - **Element string parsing** for fixed- and variable-length AIs with FNC1
   (ASCII 29) separators, bracket notation `(01)…(17)…`, AIM symbology
   identifiers (`]C1`, `]d2`, `]Q3`, `]e0`, `]J1`) and bare EAN-13 / UPC-A / GTIN-14.
+- **Element string encoding** with canonical fixed-AI ordering, FNC1 placement,
+  and human-readable interpretation through `Barcode.HRI()`.
 - **Scanner resilience by default.** UTF-8 BOM, CR/LF, NUL bytes and
   duplicated FNC1 from keyboard-wedge and USB HID scanners are normalized
   before parsing. See [ADR 0003](docs/adr/0003-scanner-resilience.md).
