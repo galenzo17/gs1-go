@@ -1,6 +1,9 @@
 package gs1
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func FuzzParse(f *testing.F) {
 	// Valid barcodes
@@ -31,6 +34,9 @@ func FuzzParse(f *testing.F) {
 				t.Errorf("Parse returned error but ParseInto did not: %v", err)
 			}
 			return
+		}
+		if strings.TrimSpace(input) != "" && len(b.Elements) == 0 {
+			t.Fatalf("successful parse of non-empty input %q returned no elements", input)
 		}
 
 		// Invariants: all elements have non-empty AI and Value.

@@ -28,6 +28,8 @@
 //
 // ParseInto reuses a caller-owned Barcode for zero-allocation parsing in
 // hot loops. Each goroutine must own its Barcode.
+// The detected AIM carrier is available as Barcode.Symbology; use
+// ParseWithOptions to opt in to ambiguous bare GTIN-8 input.
 //
 // # Validation
 //
