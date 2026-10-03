@@ -31,6 +31,11 @@
 // The detected AIM carrier is available as Barcode.Symbology; use
 // ParseWithOptions to opt in to ambiguous bare GTIN-8 input.
 //
+// Encode builds element strings for barcode generators, and Barcode.HRI
+// formats parsed elements for human-readable labels. Encode validates check
+// digits for AIs 01 and 02; SSCC and GLN check digit validation is not yet
+// provided.
+//
 // # Validation
 //
 // Parsing checks structure only. ValidateGTIN verifies the modulo-10 check
