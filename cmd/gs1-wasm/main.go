@@ -28,6 +28,7 @@ type parseResultJSON struct {
 	ExpirationDate    string        `json:"expirationDate,omitempty"`
 	ProductionDate    string        `json:"productionDate,omitempty"`
 	BestBeforeDate    string        `json:"bestBeforeDate,omitempty"`
+	Symbology         string        `json:"symbology"`
 	Warnings          []gs1.Warning `json:"warnings,omitempty"`
 }
 
@@ -80,6 +81,7 @@ func parse(_ js.Value, args []js.Value) any {
 		GLN:               b.GLN(),
 		GSIN:              b.GSIN(),
 		PackagingDate:     "",
+		Symbology:         b.Symbology.String(),
 		Warnings:          b.Warnings(),
 	}
 	for i, e := range b.Elements {

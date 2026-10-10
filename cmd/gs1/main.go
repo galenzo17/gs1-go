@@ -110,6 +110,7 @@ type parseOutput struct {
 	GSIN              string        `json:"gsin,omitempty"`
 	PackagingDate     string        `json:"packagingDate,omitempty"`
 	Error             string        `json:"error,omitempty"`
+	Symbology         string        `json:"symbology"`
 	Warnings          []gs1.Warning `json:"warnings,omitempty"`
 }
 
@@ -214,6 +215,8 @@ func parseOne(input string, b *gs1.Barcode, stdout, stderr io.Writer, opts parse
 	warnings := b.Warnings()
 	out := parseOutput{
 		Raw:               b.Raw,
+		Elements:          make([]element, 0, len(b.Elements)),
+		Symbology:         b.Symbology.String(),
 		ContentGTIN:       b.ContentGTIN(),
 		CountOfTradeItems: b.CountOfTradeItems(),
 		GLN:               b.GLN(),

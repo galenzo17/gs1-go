@@ -14,7 +14,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - Identification AIs 253, 401, 8003, 8004, 8017 and 8018, with `GDTI()` and
   `GRAI()` accessors.
 - Missing-FNC1 recovery coverage for mixed-format identification AIs.
-<<<<<<< HEAD
+- Add dependency-free element string encoding and HRI formatting.
+- Element encoding validates 01/02 GTIN check digits; SSCC and GLN check
+  digit validation remains deferred.
+- Made unsupported carrier variants fail explicitly and exposed detected
+  symbology names in CLI and WASM results.
+- Added AIM symbology carrier detection and support for EAN/UPC, ITF-14, and
+  opt-in bare GTIN-8 parsing.
 - `Measure` and typed barcode measurement accessors for net and gross weight.
 - Measurement data in CLI JSON output.
 - `DueDate()` and `Warnings()` support, including due-date advisories in CLI
