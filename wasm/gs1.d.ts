@@ -27,6 +27,8 @@ export interface GS1ParseResult {
   gsin?: string;
   /** Packaging date (AI 13). Raw YYMMDD or ISO 8601 depending on dateFormat. */
   packagingDate?: string;
+  /** Carrier name, or "unknown" when no recognized AIM prefix was present. */
+  symbology: string;
   /** Non-fatal parsing advisories. */
   warnings?: GS1Warning[];
   /** Expiration date (AI 17). Raw YYMMDD or ISO 8601 depending on dateFormat. */
