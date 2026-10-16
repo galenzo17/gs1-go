@@ -59,7 +59,7 @@ try {
 
   // The raw output parses under both strict options.
   const parsed = gs1.parse(fromBrackets.raw, { strict: true, validateCheckDigits: true });
-  assert.deepEqual(parsed.elements, [
+  assert.deepEqual(parsed.elements.map(({ ai, value }) => ({ ai, value })), [
     { ai: "01", value: "04150000021126" }, { ai: "10", value: "LOT42" }, { ai: "21", value: "SERIAL" },
   ]);
 
