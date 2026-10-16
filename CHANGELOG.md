@@ -9,6 +9,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ### Added
 
+- npm package `@galenzo17/gs1-wasm`: `wasm/package.json` with ESM exports
+  and types, a loader that resolves `gs1.wasm` and `wasm_exec.js` next to
+  itself (bundlers, CDNs and Node 20+ work without a path argument), a
+  package README, publication with npm provenance from the release
+  workflow with the version taken from the git tag, and a CI smoke test
+  that loads the package through its own loader and checks the published
+  file list.
 - Opt-in GTIN check-digit validation for AI 01 and AI 02 through
   `ParseOptions.ValidateCheckDigits`, CLI `-check-digits`, and WASM
   `validateCheckDigits`, independently of association validation.

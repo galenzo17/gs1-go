@@ -2,3 +2,4 @@ gs1.wasm
 wasm_exec.js
 example/gs1.wasm
 example/wasm_exec.js
+LICENSE

@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   release:
@@ -40,3 +41,18 @@ jobs:
         with:
           generate_release_notes: true
           files: dist/*
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+      - name: Publish npm package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          cp dist/gs1.wasm dist/wasm_exec.js wasm/
+          cp LICENSE wasm/
+          cd wasm
+          npm version --no-git-tag-version "${GITHUB_REF_NAME#v}"
+          node package.test.mjs
+          npm publish --provenance --access public
