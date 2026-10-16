@@ -272,6 +272,54 @@ func TestSSCC(t *testing.T) {
 	}
 }
 
+func TestGTINBuilders(t *testing.T) {
+	code, out, _ := exec(t, "", "gtin13", "-gcp", "7801234", "-item", "00005")
+	if code != 0 || strings.TrimSpace(out) != "7801234000056" {
+		t.Errorf("gtin13: exit %d out %q", code, out)
+	}
+	if code, _, errOut := exec(t, "", "gtin13", "-gcp", "7801234", "-item", "5"); code != 1 || !strings.Contains(errOut, "12 digits") {
+		t.Errorf("gtin13 short: exit %d stderr %q, want 1", code, errOut)
+	}
+	if code, _, errOut := exec(t, "", "gtin13", "-gcp", "7801234"); code != 2 || !strings.Contains(errOut, "usage") {
+		t.Errorf("gtin13 missing item: exit %d stderr %q, want 2", code, errOut)
+	}
+
+	code, out, _ = exec(t, "", "gtin14", "-indicator", "1", "7801234000056")
+	if code != 0 || strings.TrimSpace(out) != "17801234000053" {
+		t.Errorf("gtin14: exit %d out %q", code, out)
+	}
+	if code, _, errOut := exec(t, "", "gtin14", "-indicator", "1", "7801234000057"); code != 1 || !strings.Contains(errOut, "invalid check digit") {
+		t.Errorf("gtin14 bad GTIN-13: exit %d stderr %q, want 1", code, errOut)
+	}
+	if code, _, errOut := exec(t, "", "gtin14", "7801234000056"); code != 2 || !strings.Contains(errOut, "usage") {
+		t.Errorf("gtin14 missing indicator: exit %d stderr %q, want 2", code, errOut)
+	}
+	if code, _, _ := exec(t, "", "gtin14", "-indicator", "12", "7801234000056"); code != 2 {
+		t.Errorf("gtin14 two-digit indicator: exit %d, want 2", code)
+	}
+}
+
+func TestParseBareGTIN8Flag(t *testing.T) {
+	code, out, _ := exec(t, "", "parse", "96385074")
+	if code != 0 || !strings.Contains(out, "(96)") {
+		t.Fatalf("default: exit %d out %q, want AI interpretation", code, out)
+	}
+	code, out, _ = exec(t, "", "parse", "-gtin8", "-json", "96385074")
+	if code != 0 {
+		t.Fatalf("-gtin8: exit %d", code)
+	}
+	var got parseOutput
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Elements) != 1 || got.Elements[0].AI != "01" || got.Elements[0].Value != "00000096385074" {
+		t.Errorf("-gtin8 elements = %+v, want GTIN-8 normalized to AI 01", got.Elements)
+	}
+	if code, _, errOut := exec(t, "", "parse", "-gtin8", "-check-digits", "96385075"); code != 1 || !strings.Contains(errOut, "invalid check digit") {
+		t.Errorf("-gtin8 -check-digits: exit %d stderr %q", code, errOut)
+	}
+}
+
 func TestAI(t *testing.T) {
 	code, out, _ := exec(t, "", "ai", "3102")
 	if code != 0 || !strings.Contains(out, "Net Weight kg") || !strings.Contains(out, "N6") {

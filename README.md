@@ -324,9 +324,13 @@ gs1 parse "0104150000021126172506302112345ABC"        # text table
 gs1 parse -json -iso "(01)04150000021126(17)250200"   # JSON, ISO dates
 gs1 parse -check-digits "0104150000021126"              # GTIN check digits
 gs1 parse -strict -check-digits "0104150000021126"      # both semantic checks
+gs1 parse -gtin8 96385074                              # bare GTIN-8 instead of AI data
 gs1 parse -validate anvisa "$SCAN"                     # exit 1 if non-compliant
 cat scans.txt | gs1 parse -json                        # one JSON object per line
 gs1 gtin 04150000021126                                # check digit
+gs1 sscc -ext 3 -gcp 7801234 -serial 000000009         # 378012340000000095
+gs1 gtin13 -gcp 7801234 -item 00005                    # 7801234000056
+gs1 gtin14 -indicator 1 7801234000056                  # 17801234000053
 gs1 ai 3102                                            # AI (3102)  Net Weight kg  N6
 ```
 
@@ -342,6 +346,7 @@ The same parser runs in browsers, Electron and edge runtimes.
 ```bash
 make wasm   # produces wasm/gs1.wasm and a servable example under wasm/example/
 node wasm/check-digits.test.mjs  # optional Node runtime validation of that build
+node wasm/parity.test.mjs        # same, for measures, names, bare GTIN-8 and builders
 ```
 
 ```html
@@ -355,7 +360,14 @@ node wasm/check-digits.test.mjs  # optional Node runtime validation of that buil
   });
   r.gtin;            // "04150000021126"
   r.expirationDate;  // "2025-02-01"
+  r.elements[0];     // { ai: "01", name: "GTIN", value: "04150000021126" }
   r.warnings;         // parser advisories such as due-date-as-expiry
+
+  gs1.parse("3102001500").elements[0].measure;   // { raw: "001500", value: 15, scaled: 1500, decimals: 2, unit: "kg" }
+  gs1.parse("96385074", { assumeBareGTIN8: true }).gtin; // "00000096385074"
+
+  gs1.newSSCC("3", "7801234", "000000009");      // "378012340000000095"
+  gs1.newGTIN14("1", gs1.newGTIN13("7801234", "00005")); // "17801234000053"
 
   gs1.validateGTIN("04150000021126");            // true
   gs1.validateRegulatory(scan, "anvisa");       // null when compliant, else message
@@ -366,7 +378,11 @@ TypeScript declarations live in [`wasm/gs1.d.ts`](wasm/gs1.d.ts). Design
 notes are in [ADR 0005](docs/adr/0005-webassembly-target.md).
 The WASM `strict` option validates AI associations only; `validateCheckDigits`
 independently checks GTIN check digits and returns the usual `{ error: string }`
-object on failure. The optional Node test uses the matching `wasm_exec.js`
+object on failure. `assumeBareGTIN8` mirrors `ParseOptions.AssumeBareGTIN8`
+and the CLI `-gtin8` flag. Each element carries the AI `name` and, for
+measure AIs, a `measure` object with the same shape as the CLI JSON output.
+The builders `newSSCC`, `newGTIN13` and `newGTIN14` return the key or an
+`{ error: string }` object. The optional Node test uses the matching `wasm_exec.js`
 copied by `make wasm`; Node is not required by `make all`.
 
 ## Scope

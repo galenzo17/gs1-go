@@ -77,7 +77,7 @@ try {
   }
   assert.equal(globalThis.gs1.parse("]I20123456789012", { validateCheckDigits: true }).gtin, "01234567890128");
   assert.deepEqual(globalThis.gs1.parse("123456789013", { validateCheckDigits: true }).elements, [
-    { ai: "12", value: "345678" }, { ai: "90", value: "13" },
+    { ai: "12", name: "Due Date", value: "345678" }, { ai: "90", name: "Internal", value: "13" },
   ]);
   assert.ok(!("error" in globalThis.gs1.parse("0104150000021127", { validateCheckDigits: false })));
   assert.ok(!("error" in globalThis.gs1.parse("0104150000021127", { validateCheckDigits: "true" })));
