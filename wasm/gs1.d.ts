@@ -27,8 +27,10 @@ export interface GS1ParseResult {
   gsin?: string;
   /** Packaging date (AI 13). Raw YYMMDD or ISO 8601 depending on dateFormat. */
   packagingDate?: string;
-  /** Carrier name, or "unknown" when no recognized AIM prefix was present. */
+  /** Carrier name, "EPC" for RFID tags, or "unknown" when no recognized AIM prefix was present. */
   symbology: string;
+  /** Decoded EPC identifier; only present on parseEPC results. */
+  epc?: GS1EPC;
   /** Non-fatal parsing advisories. */
   warnings?: GS1Warning[];
   /** Expiration date (AI 17). Raw YYMMDD or ISO 8601 depending on dateFormat. */
@@ -37,6 +39,23 @@ export interface GS1ParseResult {
   productionDate?: string;
   /** Best-before date (AI 15). Raw YYMMDD or ISO 8601 depending on dateFormat. */
   bestBeforeDate?: string;
+}
+
+/** Decoded EPC Tag Data Standard identifier attached to parseEPC results. */
+export interface GS1EPC {
+  /** Scheme name as used in EPC URIs: "sgtin", "sscc", "sgln", "grai" or "giai". */
+  scheme: "sgtin" | "sscc" | "sgln" | "grai" | "giai";
+  /** Tag length of the binary coding scheme (96, 198, 195, 170, 202); absent for pure-identity URIs. */
+  bits?: number;
+  /** Filter value of a tag encoding; absent for pure-identity URIs. */
+  filter?: number;
+  companyPrefix: string;
+  /** Item reference with indicator digit, serial reference with extension digit, location reference, asset type or individual asset reference. */
+  reference: string;
+  /** SGTIN serial, SGLN extension or GRAI serial. */
+  serial?: string;
+  /** Pure-identity URI, e.g. "urn:epc:id:sgtin:0614141.812345.6789". */
+  uri: string;
 }
 
 /** Error object returned when parsing fails. */
@@ -74,6 +93,15 @@ declare global {
       input: string,
       options?: GS1ParseOptions
     ): GS1ParseResult | GS1ParseError;
+
+    /**
+     * Decode an RFID tag encoded with the EPC Tag Data Standard: hexadecimal
+     * EPC memory content (SGTIN-96/198, SSCC-96, SGLN-96/195, GRAI-96/170,
+     * GIAI-96/202), a tag URI or a pure-identity URI. Returns the same
+     * shape as parse() with the equivalent GS1 elements and an `epc`
+     * object, or an object with an `error` field.
+     */
+    function parseEPC(input: string): GS1ParseResult | GS1ParseError;
 
     /**
      * Validate a GTIN check digit.

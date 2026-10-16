@@ -250,6 +250,67 @@ func TestParseStreamJSONReportsErrorsInline(t *testing.T) {
 	}
 }
 
+func TestEPC(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		stdin    string
+		wantCode int
+		wantOut  []string
+		wantErr  string
+		check    func(t *testing.T, out string)
+	}{
+		{name: "text", args: []string{"epc", "3074257BF7194E4000001A85"},
+			wantOut: []string{"SGTIN-96 urn:epc:id:sgtin:0614141.812345.6789", "(01) 80614141123458", "GTIN", "(21) 6789", "Serial Number"}},
+		{name: "json tag URI", args: []string{"epc", "-json", "urn:epc:tag:sscc-96:3.0614141.1234567890"}, check: func(t *testing.T, out string) {
+			var got parseOutput
+			if err := json.Unmarshal([]byte(out), &got); err != nil {
+				t.Fatalf("invalid JSON: %v\n%s", err, out)
+			}
+			if got.Symbology != "EPC" || got.EPC == nil || got.EPC.Scheme != "sscc" || got.EPC.Bits != 96 || got.EPC.Filter == nil || *got.EPC.Filter != 3 ||
+				got.EPC.CompanyPrefix != "0614141" || got.EPC.Reference != "1234567890" || got.EPC.URI != "urn:epc:id:sscc:0614141.1234567890" ||
+				len(got.Elements) != 1 || got.Elements[0].AI != "00" || got.Elements[0].Value != "106141412345678908" {
+				t.Errorf("JSON = %+v epc %+v", got, got.EPC)
+			}
+		}},
+		{name: "json pure identity", args: []string{"epc", "-json", "urn:epc:id:sgln:0614141.12345.0"}, check: func(t *testing.T, out string) {
+			var got parseOutput
+			if err := json.Unmarshal([]byte(out), &got); err != nil {
+				t.Fatal(err)
+			}
+			if got.EPC == nil || got.EPC.Filter != nil || got.EPC.Bits != 0 || got.GLN != "0614141123452" || len(got.Elements) != 1 {
+				t.Errorf("pure identity JSON = %+v epc %+v", got, got.EPC)
+			}
+		}},
+		{name: "unsupported scheme", args: []string{"epc", "350000000000000000000000"}, wantCode: 1, wantErr: "unsupported EPC scheme"},
+		{name: "regulator", args: []string{"epc", "-validate", "anvisa", "3074257BF7194E4000001A85"}, wantCode: 1, wantErr: "missing required AI"},
+		{name: "bad regulator", args: []string{"epc", "-validate", "nope", "3074257BF7194E4000001A85"}, wantCode: 2, wantErr: "unknown regulator"},
+		{name: "two arguments", args: []string{"epc", "a", "b"}, wantCode: 2, wantErr: "at most one"},
+		{name: "stream", args: []string{"epc"}, stdin: "3074257BF7194E4000001A85\n\nxyz\n3174257BF4499602D2000000\n", wantCode: 1,
+			wantOut: []string{"---\n---", "(00) 106141412345678908"}, wantErr: "odd length"},
+		{name: "stream json reports errors inline", args: []string{"epc", "-json"}, stdin: "xyz\n", wantCode: 1, wantOut: []string{`"error":"gs1: invalid data`}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, out, errOut := exec(t, tt.stdin, tt.args...)
+			if code != tt.wantCode {
+				t.Errorf("exit %d, want %d (stdout %q stderr %q)", code, tt.wantCode, out, errOut)
+			}
+			for _, want := range tt.wantOut {
+				if !strings.Contains(out, want) {
+					t.Errorf("stdout %q lacks %q", out, want)
+				}
+			}
+			if tt.wantErr != "" && !strings.Contains(errOut, tt.wantErr) {
+				t.Errorf("stderr %q lacks %q", errOut, tt.wantErr)
+			}
+			if tt.check != nil {
+				tt.check(t, out)
+			}
+		})
+	}
+}
+
 func TestGTIN(t *testing.T) {
 	if code, out, _ := exec(t, "", "gtin", "04150000021126"); code != 0 || !strings.Contains(out, "valid") {
 		t.Errorf("valid GTIN: exit %d out %q", code, out)

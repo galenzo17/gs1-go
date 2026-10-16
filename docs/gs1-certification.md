@@ -76,7 +76,7 @@ or without its AIM symbology identifier, and splits it correctly.
 | 2.7 | UPC-A | Required | Covered, prefix gap | See 2.1. |
 | 2.8 | UPC-E | Required | Covered | `ExpandUPCE`. Automatic expansion under `]E0` in #15. |
 | 2.9 | GS1 QR Code | Recommended | Covered | `]Q3`. |
-| 2.10 | EPC / RFID tag | Recommended | Gap | EPC Tag Data Standard decoding proposed in #19. |
+| 2.10 | EPC / RFID tag | Recommended | Covered | `ParseEPC` and `ParseEPCURI` decode SGTIN-96/198, SSCC-96, SGLN-96/195, GRAI-96/170 and GIAI-96/202 into the equivalent element string (#19); CLI `gs1 epc`, WASM `parseEPC()`. Writing tags is out of scope. |
 
 Printing symbols (checklist wording "impresión") is covered under 3.5 and tracked in #24.
 

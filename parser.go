@@ -37,6 +37,9 @@ const (
 	SymComposite
 	// SymDotCode identifies a GS1 DotCode carrier.
 	SymDotCode
+	// SymEPC identifies an RFID tag decoded from an EPC Tag Data Standard
+	// binary encoding or URI through ParseEPC and ParseEPCURI.
+	SymEPC
 )
 
 func (s Symbology) String() string {
@@ -57,6 +60,8 @@ func (s Symbology) String() string {
 		return "Composite"
 	case SymDotCode:
 		return "DotCode"
+	case SymEPC:
+		return "EPC"
 	default:
 		return "unknown"
 	}

@@ -23,6 +23,10 @@ var ErrInvalidDate = errors.New("gs1: invalid date")
 // ErrMissingRequiredAI indicates that a barcode is missing an AI required by a regulator.
 var ErrMissingRequiredAI = errors.New("gs1: missing required AI")
 
+// ErrUnsupportedEPCScheme indicates that an EPC header or URI names a coding
+// scheme this package does not decode.
+var ErrUnsupportedEPCScheme = errors.New("gs1: unsupported EPC scheme")
+
 // ErrInvalidAssociation indicates that Application Identifiers violate a
 // required pairing, exclusion, or standalone rule.
 var ErrInvalidAssociation = errors.New("gs1: invalid AI association")
