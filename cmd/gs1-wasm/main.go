@@ -4,6 +4,9 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
 	"syscall/js"
 
 	"github.com/galenzo17/gs1-go"
@@ -130,6 +133,73 @@ func parse(_ js.Value, args []js.Value) any {
 	return js.Global().Get("JSON").Call("parse", string(data))
 }
 
+// encode builds the element string for a barcode generator from an array of
+// {ai, value} objects, from bracket notation (split literally by ParseHRI)
+// or from a raw scan string, and returns its raw, HRI and ZPL forms, or
+// {error} when the elements violate GS1 rules.
+func encode(_ js.Value, args []js.Value) any {
+	if len(args) < 1 {
+		return errorResult("encode requires 1 argument: elements array or bracket notation string")
+	}
+	elements, err := elementsArgument(args[0])
+	if err != nil {
+		return errorResult(err.Error())
+	}
+	raw, err := gs1.Encode(elements)
+	if err != nil {
+		return errorResult(err.Error())
+	}
+	zpl, err := gs1.EncodeZPL(elements)
+	if err != nil {
+		return errorResult(err.Error())
+	}
+	ordered, err := gs1.Parse(raw)
+	if err != nil {
+		return errorResult(err.Error())
+	}
+	result := js.Global().Get("Object").New()
+	result.Set("raw", raw)
+	result.Set("hri", ordered.HRI())
+	result.Set("zpl", zpl)
+	return result
+}
+
+// elementsArgument converts the JavaScript encode argument into elements.
+func elementsArgument(arg js.Value) ([]gs1.Element, error) {
+	switch arg.Type() {
+	case js.TypeString:
+		input := arg.String()
+		if strings.HasPrefix(input, "(") {
+			return gs1.ParseHRI(input)
+		}
+		parsed, err := gs1.Parse(input)
+		if err != nil {
+			return nil, err
+		}
+		return parsed.Elements, nil
+	case js.TypeObject:
+		if !js.Global().Get("Array").Call("isArray", arg).Bool() {
+			return nil, errors.New("encode expects an array of {ai, value} objects or a string")
+		}
+		n := arg.Length()
+		elements := make([]gs1.Element, 0, n)
+		for i := 0; i < n; i++ {
+			item := arg.Index(i)
+			if item.Type() != js.TypeObject {
+				return nil, fmt.Errorf("encode element %d is not an object", i)
+			}
+			ai, value := item.Get("ai"), item.Get("value")
+			if ai.Type() != js.TypeString || value.Type() != js.TypeString {
+				return nil, fmt.Errorf("encode element %d needs string ai and value", i)
+			}
+			elements = append(elements, gs1.Element{AI: ai.String(), Value: value.String()})
+		}
+		return elements, nil
+	default:
+		return nil, errors.New("encode expects an array of {ai, value} objects or a string")
+	}
+}
+
 func validateGTIN(_ js.Value, args []js.Value) any {
 	if len(args) < 1 {
 		return false
@@ -176,6 +246,7 @@ func errorResult(msg string) any {
 func main() {
 	ns := js.Global().Get("Object").New()
 	ns.Set("parse", js.FuncOf(parse))
+	ns.Set("encode", js.FuncOf(encode))
 	ns.Set("validateGTIN", js.FuncOf(validateGTIN))
 	ns.Set("validateRegulatory", js.FuncOf(validateRegulatory))
 	js.Global().Set("gs1", ns)

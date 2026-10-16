@@ -44,6 +44,16 @@ export interface GS1ParseError {
   error: string;
 }
 
+/** Result of gs1.encode(). */
+export interface GS1EncodeResult {
+  /** Scanner-equivalent element string; FNC1 is the ASCII GS character (0x1D). */
+  raw: string;
+  /** Human-readable interpretation in encoding order, e.g. "(01)04150000021126(10)LOT42". */
+  hri: string;
+  /** ZPL ^FD field data for ^BC in automatic mode, with >8 FNC1 escapes. */
+  zpl: string;
+}
+
 /** Options for gs1.parse(). */
 export interface GS1ParseOptions {
   /** Validate Application Identifier association rules. */
@@ -74,6 +84,19 @@ declare global {
       input: string,
       options?: GS1ParseOptions
     ): GS1ParseResult | GS1ParseError;
+
+    /**
+     * Build the element string for a barcode generator. Accepts an array of
+     * {ai, value} objects, bracket notation such as
+     * "(01)04150000021126(10)LOT42" (split literally, so the AIs are exactly
+     * the ones written) or a raw scan string. Predefined-length AIs are emitted
+     * first, FNC1 is placed where required, and association rules and
+     * check digits are enforced. Returns an object with an `error` field
+     * when the elements violate GS1 rules.
+     */
+    function encode(
+      elements: GS1Element[] | string
+    ): GS1EncodeResult | GS1ParseError;
 
     /**
      * Validate a GTIN check digit.

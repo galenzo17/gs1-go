@@ -84,6 +84,34 @@ func ExampleValidateGTIN() {
 	// true
 }
 
+func ExampleEncode() {
+	elements := []gs1.Element{
+		{AI: "10", Value: "ABC123"},
+		{AI: "00", Value: "790123451234500116"},
+		{AI: "02", Value: "49012345008794"},
+		{AI: "37", Value: "12"},
+	}
+	raw, _ := gs1.Encode(elements)
+	zpl, _ := gs1.EncodeZPL(elements)
+	b, _ := gs1.Parse(raw)
+	fmt.Printf("%q\n%s\n%s\n", raw, zpl, b.HRI())
+
+	_, err := gs1.Encode([]gs1.Element{{AI: "02", Value: "49012345008794"}})
+	fmt.Println(errors.Is(err, gs1.ErrInvalidAssociation), err)
+	// Output:
+	// "\x1d00790123451234500116024901234500879410ABC123\x1d3712"
+	// >800790123451234500116024901234500879410ABC123>83712
+	// (00)790123451234500116(02)49012345008794(10)ABC123(37)12
+	// true gs1: invalid AI association: AI (02) requires AI (37)
+}
+
+func ExampleParseHRI() {
+	elements, _ := gs1.ParseHRI("(01)04150000021126(10)LOT42")
+	fmt.Println(elements)
+	// Output:
+	// [{01 04150000021126} {10 LOT42}]
+}
+
 func ExampleParseDateWithOptions() {
 	last, _ := gs1.ParseDate("250200")
 	first, _ := gs1.ParseDateWithOptions("250200", gs1.DateOptions{DayZero: gs1.DayZeroFirstDay})

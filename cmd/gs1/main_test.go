@@ -250,6 +250,59 @@ func TestParseStreamJSONReportsErrorsInline(t *testing.T) {
 	}
 }
 
+func TestEncode(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		stdin    string
+		wantCode int
+		wantOut  string
+		wantErr  string
+	}{
+		{name: "raw", args: []string{"encode", "(10)LOT42(01)04150000021126(21)SERIAL"}, wantOut: "\x1D0104150000021126" + "10LOT42\x1D21SERIAL\n"},
+		{name: "hri reorders", args: []string{"encode", "-hri", "(10)LOT42(01)04150000021126(21)SERIAL"}, wantOut: "(01)04150000021126(10)LOT42(21)SERIAL\n"},
+		{name: "zpl", args: []string{"encode", "-zpl", "(10)LOT42(01)04150000021126(21)SERIAL"}, wantOut: ">80104150000021126" + "10LOT42>821SERIAL\n"},
+		{name: "zpl escapes greater-than", args: []string{"encode", "-zpl", "(01)04150000021126(10)A>B"}, wantOut: ">80104150000021126" + "10A><B\n"},
+		{name: "raw scan input", args: []string{"encode", "-hri", "]d20104150000021126" + "10LOT42"}, wantOut: "(01)04150000021126(10)LOT42\n"},
+		{name: "logistic label", args: []string{"encode", "-hri", "(00)790123451234500116(02)49012345008794(37)12(10)ABC123"}, wantOut: "(00)790123451234500116(02)49012345008794(37)12(10)ABC123\n"},
+		{name: "association", args: []string{"encode", "(02)49012345008794(37)12"}, wantCode: 1, wantErr: "AI (37) requires AI (00)"},
+		{name: "check digit", args: []string{"encode", "(01)04150000021127"}, wantCode: 1, wantErr: "invalid check digit"},
+		{name: "unknown AI", args: []string{"encode", "(999)1"}, wantCode: 1, wantErr: "unknown application identifier"},
+		{name: "malformed HRI", args: []string{"encode", "(01"}, wantCode: 1, wantErr: "invalid data"},
+		{name: "empty value", args: []string{"encode", "(01)(10)LOT"}, wantCode: 1, wantErr: "has no value"},
+		{name: "both flags", args: []string{"encode", "-hri", "-zpl", "(01)04150000021126"}, wantCode: 2, wantErr: "mutually exclusive"},
+		{name: "too many arguments", args: []string{"encode", "(01)04150000021126", "(10)X"}, wantCode: 2, wantErr: "at most one"},
+		{name: "stdin stream", args: []string{"encode", "-hri"}, stdin: "(10)A(01)04150000021126\n\n(21)S\n(00)790123451234500116\n", wantCode: 1,
+			wantOut: "(01)04150000021126(10)A\n(00)790123451234500116\n", wantErr: "AI (21) requires"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, out, errOut := exec(t, tt.stdin, tt.args...)
+			if code != tt.wantCode || out != tt.wantOut || !strings.Contains(errOut, tt.wantErr) {
+				t.Errorf("exit %d stdout %q stderr %q, want exit %d stdout %q stderr containing %q", code, out, errOut, tt.wantCode, tt.wantOut, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestEncodeRoundTripsThroughParse(t *testing.T) {
+	code, raw, _ := exec(t, "", "encode", "(10)LOT42(01)04150000021126(17)250630")
+	if code != 0 {
+		t.Fatalf("encode exit %d", code)
+	}
+	code, out, _ := exec(t, "", "parse", "-strict", "-check-digits", "-json", strings.TrimSpace(raw))
+	if code != 0 {
+		t.Fatalf("parse exit %d", code)
+	}
+	var got parseOutput
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Elements) != 3 || got.Elements[0].AI != "01" || got.Elements[1].AI != "17" || got.Elements[2].Value != "LOT42" {
+		t.Errorf("parse(encode()) elements = %+v", got.Elements)
+	}
+}
+
 func TestGTIN(t *testing.T) {
 	if code, out, _ := exec(t, "", "gtin", "04150000021126"); code != 0 || !strings.Contains(out, "valid") {
 		t.Errorf("valid GTIN: exit %d out %q", code, out)
