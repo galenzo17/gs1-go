@@ -93,3 +93,9 @@ declare global {
     ): string | null;
   }
 }
+
+/**
+ * Load and initialize the GS1 WASM module. Resolves gs1.wasm and
+ * wasm_exec.js next to the loader unless a URL or path is given.
+ */
+export declare function loadGS1(wasmPath?: string | URL): Promise<typeof gs1>;

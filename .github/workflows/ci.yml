@@ -53,6 +53,36 @@ jobs:
       - run: GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o gs1.wasm ./cmd/gs1-wasm
       - run: ls -la gs1.wasm
 
+  npm-package:
+    name: npm package smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - run: make wasm
+      - run: cp LICENSE wasm/
+      - name: Loader resolves the binary next to itself
+        run: node wasm/package.test.mjs
+      - name: Package contains exactly the published files
+        run: |
+          cd wasm
+          npm pack --dry-run --json | node -e '
+            const [pkg] = JSON.parse(require("fs").readFileSync(0, "utf8"));
+            const files = pkg.files.map((f) => f.path).sort();
+            const want = ["LICENSE", "README.md", "gs1-loader.js", "gs1.d.ts", "gs1.wasm", "package.json", "wasm_exec.js"];
+            if (JSON.stringify(files) !== JSON.stringify(want)) {
+              console.error("npm pack would ship", files, "want", want);
+              process.exit(1);
+            }
+            console.log("npm pack ships", files.join(", "));
+          '
+
+
   smoke-fuzz:
     name: Fuzz (smoke)
     runs-on: ubuntu-latest

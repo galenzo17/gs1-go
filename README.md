@@ -337,18 +337,33 @@ enables GTIN check-digit validation for AI 01 and AI 02.
 
 ## WebAssembly
 
-The same parser runs in browsers, Electron and edge runtimes.
+The same parser runs in browsers, Electron and Node, published to npm as
+[`@galenzo17/gs1-wasm`](https://www.npmjs.com/package/@galenzo17/gs1-wasm)
+with the version of the git tag and npm provenance:
+
+```bash
+npm install @galenzo17/gs1-wasm
+```
+
+```js
+import { loadGS1 } from "@galenzo17/gs1-wasm";
+const gs1 = await loadGS1(); // gs1.wasm and wasm_exec.js resolve next to the loader
+```
+
+The same files are attached to every GitHub release and served by jsDelivr
+and unpkg for `<script type="module">` use without a build step; see
+[`wasm/README.md`](wasm/README.md). To build locally:
 
 ```bash
 make wasm   # produces wasm/gs1.wasm and a servable example under wasm/example/
+make npm-check                   # loads the package through its own loader, lists what npm would ship
 node wasm/check-digits.test.mjs  # optional Node runtime validation of that build
 ```
 
 ```html
-<script src="wasm_exec.js"></script>
 <script type="module">
   import { loadGS1 } from './gs1-loader.js';
-  const gs1 = await loadGS1('gs1.wasm');
+  const gs1 = await loadGS1();
 
   const r = gs1.parse("0104150000021126172502001012345", {
     dateFormat: "iso", dayZero: "first", validateCheckDigits: true

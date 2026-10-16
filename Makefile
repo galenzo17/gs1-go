@@ -2,7 +2,7 @@ GO      ?= go
 PKG     := ./...
 FUZZTIME ?= 30s
 
-.PHONY: all test race cover lint vet fuzz bench wasm build clean
+.PHONY: all test race cover lint vet fuzz bench wasm build clean npm-check
 
 all: vet lint test
 
@@ -34,5 +34,12 @@ build:
 wasm:
 	bash wasm/build.sh
 
+# npm-check builds the WebAssembly bundle and verifies the npm package
+# loads through its own loader and ships exactly the published files.
+npm-check: wasm
+	cp LICENSE wasm/
+	node wasm/package.test.mjs
+	cd wasm && npm pack --dry-run
+
 clean:
-	rm -f gs1 coverage.out wasm/gs1.wasm wasm/wasm_exec.js wasm/example/gs1.wasm wasm/example/wasm_exec.js
+	rm -f gs1 coverage.out wasm/gs1.wasm wasm/wasm_exec.js wasm/LICENSE wasm/example/gs1.wasm wasm/example/wasm_exec.js

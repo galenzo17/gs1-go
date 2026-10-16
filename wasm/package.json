@@ -1,0 +1,43 @@
+{
+  "name": "@galenzo17/gs1-wasm",
+  "version": "0.0.0-dev",
+  "description": "GS1 Application Identifier parser and validator compiled to WebAssembly: GS1-128, GS1 DataMatrix, GS1 QR, EAN/UPC element strings for browsers, Electron and Node.",
+  "license": "MIT",
+  "author": "Agustín Bereciartúa Castillo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/galenzo17/gs1-go.git",
+    "directory": "wasm"
+  },
+  "homepage": "https://github.com/galenzo17/gs1-go#webassembly",
+  "bugs": "https://github.com/galenzo17/gs1-go/issues",
+  "keywords": ["gs1", "barcode", "gs1-128", "datamatrix", "gtin", "sscc", "application-identifier", "wasm", "webassembly"],
+  "type": "module",
+  "main": "./gs1-loader.js",
+  "types": "./gs1.d.ts",
+  "exports": {
+    ".": {
+      "types": "./gs1.d.ts",
+      "import": "./gs1-loader.js"
+    },
+    "./gs1.wasm": "./gs1.wasm",
+    "./wasm_exec.js": "./wasm_exec.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "gs1.wasm",
+    "wasm_exec.js",
+    "gs1-loader.js",
+    "gs1.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}
