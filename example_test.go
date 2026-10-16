@@ -84,6 +84,34 @@ func ExampleValidateGTIN() {
 	// true
 }
 
+func ExampleValidateSSCC() {
+	fmt.Println(gs1.ValidateSSCC("106141411234567897"))
+
+	err := gs1.ValidateSSCC("106141411234567891")
+	fmt.Println(errors.Is(err, gs1.ErrInvalidCheckDigit))
+	// Output:
+	// <nil>
+	// true
+}
+
+func ExampleValidateKey() {
+	types, err := gs1.ValidateKey("0614141000012")
+	fmt.Println(types, err)
+
+	_, err = gs1.ValidateKey("106141411234567891")
+	fmt.Println(errors.Is(err, gs1.ErrInvalidCheckDigit))
+	// Output:
+	// [GTIN GLN] <nil>
+	// true
+}
+
+func ExampleParseWithOptions_checkDigits() {
+	_, err := gs1.ParseWithOptions("00106141411234567891", gs1.ParseOptions{ValidateCheckDigits: true})
+	fmt.Println(errors.Is(err, gs1.ErrInvalidCheckDigit), err)
+	// Output:
+	// true at position 0: AI (00): gs1: invalid check digit: expected '7', got '1'
+}
+
 func ExampleParseDateWithOptions() {
 	last, _ := gs1.ParseDate("250200")
 	first, _ := gs1.ParseDateWithOptions("250200", gs1.DateOptions{DayZero: gs1.DayZeroFirstDay})

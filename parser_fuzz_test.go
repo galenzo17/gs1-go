@@ -15,6 +15,12 @@ func FuzzParse(f *testing.F) {
 	f.Add("21SERIAL1\x1D10BATCH2")
 	f.Add("3102001500")
 	f.Add("713BR12345678")
+	f.Add("00106141411234567897")
+	f.Add("4140614141000012")
+	f.Add("40206141410000000012")
+	f.Add("8017061414112345678902")
+	f.Add("2530614141000012ABC")
+	f.Add("800300614141000012XYZ")
 	// Invalid inputs
 	f.Add("")
 	f.Add("abc")
@@ -25,6 +31,8 @@ func FuzzParse(f *testing.F) {
 	f.Add("0204150000021127")
 	f.Add("]E000123458")
 	f.Add("]I20123456789012")
+	f.Add("00106141411234567891")
+	f.Add("4140614141000013")
 
 	var reused Barcode
 

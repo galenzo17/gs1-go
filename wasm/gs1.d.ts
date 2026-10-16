@@ -44,11 +44,31 @@ export interface GS1ParseError {
   error: string;
 }
 
+/** Numeric GS1 key families that end in a modulo-10 check digit. */
+export type GS1KeyType = "GTIN" | "SSCC" | "GLN" | "GSIN" | "GSRN";
+
+/** Result of gs1.validateKey(). */
+export interface GS1KeyResult {
+  /** True when the length matches a key family and the check digit is correct. */
+  valid: boolean;
+  /**
+   * Key families the length admits, in the order GTIN, SSCC, GLN, GSIN, GSRN.
+   * GTIN-13 and GLN share 13 digits; SSCC and GSRN share 18. Empty on error.
+   */
+  keyTypes: GS1KeyType[];
+  /** Reason the key is invalid: length, non-digit characters or check digit. */
+  error?: string;
+}
+
 /** Options for gs1.parse(). */
 export interface GS1ParseOptions {
   /** Validate Application Identifier association rules. */
   strict?: boolean;
-  /** Validate GTIN check digits for AI 01 and AI 02, independently of strict. */
+  /**
+   * Validate the check digit of every numeric GS1 key in the element string
+   * (GTIN, SSCC, GLN family, GSIN, GSRN, GDTI and GRAI prefixes),
+   * independently of strict.
+   */
   validateCheckDigits?: boolean;
   /**
    * Date output format.
@@ -80,6 +100,12 @@ declare global {
      * Accepts GTIN-8, GTIN-12, GTIN-13, and GTIN-14.
      */
     function validateGTIN(gtin: string): boolean;
+
+    /**
+     * Validate the check digit of any numeric GS1 key (GTIN-8/12/13/14,
+     * SSCC, GLN, GSIN, GSRN) and report the families its length admits.
+     */
+    function validateKey(key: string): GS1KeyResult;
 
     /**
      * Validate barcode against a LATAM regulator's requirements.

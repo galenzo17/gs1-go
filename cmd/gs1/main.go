@@ -5,6 +5,7 @@
 //
 //	gs1 parse [-json] [-iso] [-strict] [-check-digits] [-validate REGULATOR] [BARCODE]
 //	gs1 gtin GTIN
+//	gs1 key KEY
 //	gs1 sscc -ext DIGIT -gcp PREFIX -serial REFERENCE
 //	gs1 ai CODE
 //	gs1 version
@@ -45,6 +46,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runParse(args[1:], stdin, stdout, stderr)
 	case "gtin":
 		return runGTIN(args[1:], stdout, stderr)
+	case "key":
+		return runKey(args[1:], stdout, stderr)
 	case "sscc":
 		return runSSCC(args[1:], stdout, stderr)
 	case "ai":
@@ -68,6 +71,7 @@ func usage(w io.Writer) {
 Usage:
   gs1 parse [-json] [-iso] [-strict] [-check-digits] [-validate REGULATOR] [BARCODE]
   gs1 gtin GTIN
+  gs1 key KEY
   gs1 sscc -ext DIGIT -gcp PREFIX -serial REFERENCE
   gs1 ai CODE
   gs1 version
@@ -76,6 +80,8 @@ Commands:
   parse    Parse a GS1-128 / DataMatrix element string. Reads stdin line by
            line when BARCODE is omitted.
   gtin     Validate the check digit of a GTIN-8/12/13/14.
+  key      Validate the check digit of any numeric GS1 key (GTIN, SSCC, GLN,
+           GSIN, GSRN) and report the key types its length admits.
   sscc     Build an 18-digit Serial Shipping Container Code.
   ai       Show name and format of an Application Identifier.
   version  Print the build version.
@@ -137,7 +143,7 @@ func runParse(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.BoolVar(&opts.json, "json", false, "emit one JSON object per barcode")
 	fs.BoolVar(&opts.iso, "iso", false, "render date AIs (11, 12, 13, 15, 17) as ISO 8601")
 	fs.BoolVar(&opts.strict, "strict", false, "validate AI association rules")
-	fs.BoolVar(&opts.checkDigits, "check-digits", false, "validate GTIN check digits (AI 01 and AI 02)")
+	fs.BoolVar(&opts.checkDigits, "check-digits", false, "validate GS1 key check digits (GTIN, SSCC, GLN, GSIN, GSRN, GDTI, GRAI)")
 	fs.StringVar(&opts.validate, "validate", "", "check required AIs for a regulator: anvisa, anmat, snfa, cofepris")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -320,6 +326,34 @@ func runGTIN(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintln(stdout, "valid")
 	return 0
+}
+
+// runKey validates a numeric key whose family is unknown and names every
+// family its length admits, since GTIN-13 and GLN, or SSCC and GSRN, share
+// the same digits and check-digit algorithm.
+func runKey(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: gs1 key KEY")
+		return 2
+	}
+	types, err := gs1.ValidateKey(args[0])
+	if err != nil {
+		fmt.Fprintln(stderr, "gs1:", err)
+		if errors.Is(err, gs1.ErrInvalidCheckDigit) {
+			return 1
+		}
+		return 2
+	}
+	fmt.Fprintln(stdout, "valid", formatKeyTypes(types))
+	return 0
+}
+
+func formatKeyTypes(types []gs1.KeyType) string {
+	names := make([]string, len(types))
+	for i, t := range types {
+		names[i] = t.String()
+	}
+	return strings.Join(names, " or ")
 }
 
 func runSSCC(args []string, stdout, stderr io.Writer) int {
