@@ -10,8 +10,20 @@ import (
 )
 
 type elementJSON struct {
-	AI    string `json:"ai"`
-	Value string `json:"value"`
+	AI      string       `json:"ai"`
+	Name    string       `json:"name,omitempty"`
+	Value   string       `json:"value"`
+	Measure *measureJSON `json:"measure,omitempty"`
+}
+
+// measureJSON mirrors the CLI JSON measure object so both entry points
+// expose implied-decimal weights the same way.
+type measureJSON struct {
+	Raw      string  `json:"raw"`
+	Value    float64 `json:"value"`
+	Scaled   int64   `json:"scaled"`
+	Decimals int     `json:"decimals"`
+	Unit     string  `json:"unit"`
 }
 
 type parseResultJSON struct {
@@ -49,8 +61,7 @@ func parse(_ js.Value, args []js.Value) any {
 	// Parse optional date formatting and independent semantic checks.
 	dateFormat := "raw"
 	dayZero := gs1.DayZeroLastDay
-	strict := false
-	validateCheckDigits := false
+	var parseOpts gs1.ParseOptions
 	if len(args) >= 2 && args[1].Type() == js.TypeObject {
 		opts := args[1]
 		if df := opts.Get("dateFormat"); df.Type() == js.TypeString {
@@ -62,17 +73,17 @@ func parse(_ js.Value, args []js.Value) any {
 			}
 		}
 		if s := opts.Get("strict"); s.Type() == js.TypeBoolean {
-			strict = s.Bool()
+			parseOpts.ValidateAssociations = s.Bool()
 		}
 		if c := opts.Get("validateCheckDigits"); c.Type() == js.TypeBoolean {
-			validateCheckDigits = c.Bool()
+			parseOpts.ValidateCheckDigits = c.Bool()
+		}
+		if g := opts.Get("assumeBareGTIN8"); g.Type() == js.TypeBoolean {
+			parseOpts.AssumeBareGTIN8 = g.Bool()
 		}
 	}
 
-	b, err := gs1.ParseWithOptions(input, gs1.ParseOptions{
-		ValidateAssociations: strict,
-		ValidateCheckDigits:  validateCheckDigits,
-	})
+	b, err := gs1.ParseWithOptions(input, parseOpts)
 	if err != nil {
 		return errorResult(err.Error())
 	}
@@ -93,6 +104,12 @@ func parse(_ js.Value, args []js.Value) any {
 	}
 	for i, e := range b.Elements {
 		result.Elements[i] = elementJSON{AI: e.AI, Value: e.Value}
+		if ai, ok := gs1.LookupAI(e.AI); ok {
+			result.Elements[i].Name = ai.Name
+		}
+		if m, ok := measureForElement(e); ok {
+			result.Elements[i].Measure = &measureJSON{Raw: m.Raw, Value: m.Value, Scaled: m.Scaled, Decimals: m.Decimals, Unit: m.Unit}
+		}
 	}
 
 	// Resolve date fields based on options.
@@ -128,6 +145,61 @@ func parse(_ js.Value, args []js.Value) any {
 		return errorResult(err.Error())
 	}
 	return js.Global().Get("JSON").Call("parse", string(data))
+}
+
+// measureForElement decodes the implied decimals of a four-digit measure AI
+// through the same accessor the Go API exposes.
+func measureForElement(e gs1.Element) (gs1.Measure, bool) {
+	if len(e.AI) != 4 {
+		return gs1.Measure{}, false
+	}
+	return gs1.Barcode{Elements: []gs1.Element{e}}.Measure(e.AI[:3])
+}
+
+// newSSCC builds an SSCC from an extension digit, a company prefix and a
+// serial reference, returning the 18-digit string or {error}.
+func newSSCC(_ js.Value, args []js.Value) any {
+	if len(args) < 3 {
+		return errorResult("newSSCC requires 3 arguments: extensionDigit, companyPrefix, serialReference")
+	}
+	extension := args[0].String()
+	if len(extension) != 1 {
+		return errorResult("newSSCC: extension digit must be a single digit")
+	}
+	sscc, err := gs1.NewSSCC(extension[0], args[1].String(), args[2].String())
+	if err != nil {
+		return errorResult(err.Error())
+	}
+	return sscc
+}
+
+// newGTIN13 builds a GTIN-13 from a company prefix and an item reference.
+func newGTIN13(_ js.Value, args []js.Value) any {
+	if len(args) < 2 {
+		return errorResult("newGTIN13 requires 2 arguments: companyPrefix, itemReference")
+	}
+	gtin, err := gs1.NewGTIN13(args[0].String(), args[1].String())
+	if err != nil {
+		return errorResult(err.Error())
+	}
+	return gtin
+}
+
+// newGTIN14 builds a case-level GTIN-14 from an indicator digit and a
+// GTIN-13.
+func newGTIN14(_ js.Value, args []js.Value) any {
+	if len(args) < 2 {
+		return errorResult("newGTIN14 requires 2 arguments: indicator, gtin13")
+	}
+	indicator := args[0].String()
+	if len(indicator) != 1 {
+		return errorResult("newGTIN14: indicator must be a single digit")
+	}
+	gtin, err := gs1.NewGTIN14(indicator[0], args[1].String())
+	if err != nil {
+		return errorResult(err.Error())
+	}
+	return gtin
 }
 
 func validateGTIN(_ js.Value, args []js.Value) any {
@@ -178,6 +250,9 @@ func main() {
 	ns.Set("parse", js.FuncOf(parse))
 	ns.Set("validateGTIN", js.FuncOf(validateGTIN))
 	ns.Set("validateRegulatory", js.FuncOf(validateRegulatory))
+	ns.Set("newSSCC", js.FuncOf(newSSCC))
+	ns.Set("newGTIN13", js.FuncOf(newGTIN13))
+	ns.Set("newGTIN14", js.FuncOf(newGTIN14))
 	js.Global().Set("gs1", ns)
 
 	// Keep the Go runtime alive.
