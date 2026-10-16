@@ -53,10 +53,9 @@ docs(readme): document ParseInto reuse contract
 
 ## Release process
 
-1. Move the *Unreleased* section of `CHANGELOG.md` under a new version heading.
-2. Tag: `git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z`.
-3. The release workflow runs the test suite, builds CLI binaries and the WASM
-   bundle, and publishes a GitHub release with generated notes.
+See [RELEASING.md](RELEASING.md): the module proxy rules (immutable tags,
+`retract`, `v0.x` versus `v1.0.0` versus `/v2`), the checklist before
+tagging, what the tag publishes and the criteria for `v1.0.0`.
 
 ## Legal
 
