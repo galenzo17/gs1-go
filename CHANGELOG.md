@@ -9,6 +9,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ### Added
 
+- EPC Tag Data Standard decoding: `ParseEPC` and `DecodeEPC` read the
+  hexadecimal memory content of SGTIN-96/198, SSCC-96, SGLN-96/195,
+  GRAI-96/170 and GIAI-96/202 tags, `ParseEPCURI` and `DecodeEPCURI` read
+  tag and pure-identity URIs, and both yield the equivalent element string
+  ((01)+(21), (00), (414)+(254), (8003), (8004)) with `Symbology` `SymEPC`.
+  CLI `gs1 epc` and WASM `parseEPC()` expose it with an `epc` object in the
+  JSON result.
 - Opt-in GTIN check-digit validation for AI 01 and AI 02 through
   `ParseOptions.ValidateCheckDigits`, CLI `-check-digits`, and WASM
   `validateCheckDigits`, independently of association validation.

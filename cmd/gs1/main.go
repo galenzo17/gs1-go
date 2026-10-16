@@ -4,6 +4,7 @@
 // Usage:
 //
 //	gs1 parse [-json] [-iso] [-strict] [-check-digits] [-validate REGULATOR] [BARCODE]
+//	gs1 epc [-json] [-validate REGULATOR] [EPC]
 //	gs1 gtin GTIN
 //	gs1 sscc -ext DIGIT -gcp PREFIX -serial REFERENCE
 //	gs1 ai CODE
@@ -22,6 +23,7 @@ import (
 	"io"
 	"os"
 	"runtime/debug"
+	"strconv"
 	"strings"
 
 	"github.com/galenzo17/gs1-go"
@@ -43,6 +45,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "parse":
 		return runParse(args[1:], stdin, stdout, stderr)
+	case "epc":
+		return runEPC(args[1:], stdin, stdout, stderr)
 	case "gtin":
 		return runGTIN(args[1:], stdout, stderr)
 	case "sscc":
@@ -67,6 +71,7 @@ func usage(w io.Writer) {
 
 Usage:
   gs1 parse [-json] [-iso] [-strict] [-check-digits] [-validate REGULATOR] [BARCODE]
+  gs1 epc [-json] [-validate REGULATOR] [EPC]
   gs1 gtin GTIN
   gs1 sscc -ext DIGIT -gcp PREFIX -serial REFERENCE
   gs1 ai CODE
@@ -75,6 +80,10 @@ Usage:
 Commands:
   parse    Parse a GS1-128 / DataMatrix element string. Reads stdin line by
            line when BARCODE is omitted.
+  epc      Decode an RFID tag (EPC Tag Data Standard hexadecimal memory
+           content, tag URI or pure-identity URI) into the equivalent
+           element string: SGTIN, SSCC, SGLN, GRAI and GIAI. Reads stdin
+           line by line when EPC is omitted.
   gtin     Validate the check digit of a GTIN-8/12/13/14.
   sscc     Build an 18-digit Serial Shipping Container Code.
   ai       Show name and format of an Application Identifier.
@@ -104,6 +113,7 @@ type measureOutput struct {
 type parseOutput struct {
 	Raw               string        `json:"raw"`
 	Elements          []element     `json:"elements"`
+	EPC               *epcOutput    `json:"epc,omitempty"`
 	ContentGTIN       string        `json:"contentGtin,omitempty"`
 	CountOfTradeItems string        `json:"countOfTradeItems,omitempty"`
 	GLN               string        `json:"gln,omitempty"`
@@ -112,6 +122,17 @@ type parseOutput struct {
 	Error             string        `json:"error,omitempty"`
 	Symbology         string        `json:"symbology"`
 	Warnings          []gs1.Warning `json:"warnings,omitempty"`
+}
+
+// epcOutput is the JSON shape of a decoded EPC identifier.
+type epcOutput struct {
+	Scheme        string `json:"scheme"`
+	Bits          int    `json:"bits,omitempty"`
+	Filter        *int   `json:"filter,omitempty"`
+	CompanyPrefix string `json:"companyPrefix"`
+	Reference     string `json:"reference"`
+	Serial        string `json:"serial,omitempty"`
+	URI           string `json:"uri"`
 }
 
 type parseOptions struct {
@@ -211,6 +232,12 @@ func parseOne(input string, b *gs1.Barcode, stdout, stderr io.Writer, opts parse
 	}); err != nil {
 		return err
 	}
+	return renderBarcode(b, nil, stdout, stderr, opts)
+}
+
+// renderBarcode applies the regulator check and writes the barcode in the
+// text or JSON format shared by parse and epc.
+func renderBarcode(b *gs1.Barcode, epc *epcOutput, stdout, stderr io.Writer, opts parseOptions) error {
 	if opts.regulator != nil {
 		if err := opts.regulator.Validate(*b); err != nil {
 			return err
@@ -221,6 +248,7 @@ func parseOne(input string, b *gs1.Barcode, stdout, stderr io.Writer, opts parse
 	out := parseOutput{
 		Raw:               b.Raw,
 		Elements:          make([]element, 0, len(b.Elements)),
+		EPC:               epc,
 		Symbology:         b.Symbology.String(),
 		ContentGTIN:       b.ContentGTIN(),
 		CountOfTradeItems: b.CountOfTradeItems(),
@@ -243,7 +271,105 @@ func parseOne(input string, b *gs1.Barcode, stdout, stderr io.Writer, opts parse
 	if opts.json {
 		return json.NewEncoder(stdout).Encode(out)
 	}
+	if epc != nil {
+		if _, err := fmt.Fprintf(stdout, "%s %s\n", epcSchemeLabel(*epc), epc.URI); err != nil {
+			return err
+		}
+	}
 	return writeTextOutput(stdout, out.Elements)
+}
+
+func epcSchemeLabel(epc epcOutput) string {
+	label := strings.ToUpper(epc.Scheme)
+	if epc.Bits > 0 {
+		label += "-" + strconv.Itoa(epc.Bits)
+	}
+	return label
+}
+
+func runEPC(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("gs1 epc", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var opts parseOptions
+	fs.BoolVar(&opts.json, "json", false, "emit one JSON object per tag")
+	fs.StringVar(&opts.validate, "validate", "", "check required AIs for a regulator: anvisa, anmat, snfa, cofepris")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if opts.validate != "" {
+		reg, ok := regulators[strings.ToLower(opts.validate)]
+		if !ok {
+			fmt.Fprintf(stderr, "gs1: unknown regulator %q (valid: anvisa, anmat, snfa, cofepris)\n", opts.validate)
+			return 2
+		}
+		opts.regulator = &reg
+	}
+	switch fs.NArg() {
+	case 0:
+		return epcStream(stdin, stdout, stderr, opts)
+	case 1:
+		if err := epcOne(fs.Arg(0), stdout, stderr, opts); err != nil {
+			fmt.Fprintln(stderr, "gs1:", err)
+			return 1
+		}
+		return 0
+	default:
+		fmt.Fprintln(stderr, "gs1: epc accepts at most one tag; pipe multiple tags on stdin")
+		return 2
+	}
+}
+
+func epcStream(stdin io.Reader, stdout, stderr io.Writer, opts parseOptions) int {
+	sc := bufio.NewScanner(stdin)
+	failed := false
+	first := true
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" {
+			continue
+		}
+		if !first && !opts.json {
+			fmt.Fprintln(stdout, "---")
+		}
+		first = false
+		if err := epcOne(line, stdout, stderr, opts); err != nil {
+			failed = true
+			if opts.json {
+				_ = json.NewEncoder(stdout).Encode(parseOutput{Raw: line, Error: err.Error()})
+			} else {
+				fmt.Fprintln(stderr, "gs1:", err)
+			}
+		}
+	}
+	if err := sc.Err(); err != nil {
+		fmt.Fprintln(stderr, "gs1: reading stdin:", err)
+		return 1
+	}
+	if failed {
+		return 1
+	}
+	return 0
+}
+
+// epcOne decodes a hexadecimal tag or an EPC URI and renders it like parse.
+func epcOne(input string, stdout, stderr io.Writer, opts parseOptions) error {
+	var epc gs1.EPC
+	var err error
+	if strings.HasPrefix(input, "urn:") {
+		epc, err = gs1.DecodeEPCURI(input)
+	} else {
+		epc, err = gs1.DecodeEPC(input)
+	}
+	if err != nil {
+		return err
+	}
+	b := gs1.Barcode{Raw: input, Symbology: gs1.SymEPC, Elements: epc.Elements()}
+	out := epcOutput{Scheme: epc.Scheme.String(), Bits: epc.Bits, CompanyPrefix: epc.CompanyPrefix, Reference: epc.Reference, Serial: epc.Serial, URI: epc.URI()}
+	if epc.Filter >= 0 {
+		filter := epc.Filter
+		out.Filter = &filter
+	}
+	return renderBarcode(&b, &out, stdout, stderr, opts)
 }
 
 // buildElements converts parsed elements into their output representation.

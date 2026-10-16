@@ -36,6 +36,13 @@
 // digits for AIs 01 and 02; SSCC and GLN check digit validation is not yet
 // provided.
 //
+// # RFID
+//
+// ParseEPC and ParseEPCURI decode EPC Tag Data Standard identifiers
+// (SGTIN, SSCC, SGLN, GRAI, GIAI) from tag memory or EPC URIs into the same
+// Barcode shape as barcode scans; DecodeEPC and DecodeEPCURI expose the
+// identifier fields.
+//
 // # Validation
 //
 // Parsing checks structure only. ValidateGTIN verifies the modulo-10 check

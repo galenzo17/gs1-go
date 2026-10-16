@@ -194,6 +194,30 @@ caseGTIN, _ := gs1.NewGTIN14('1', gtin13)
 to recover the SSCC components. Allocation counters and persistence remain
 the application's responsibility.
 
+### RFID tags (EPC)
+
+RFID reads land in the same `Barcode` shape as barcode scans. `ParseEPC`
+decodes the hexadecimal EPC memory content of a tag and `ParseEPCURI` a tag
+or pure-identity URI; `DecodeEPC` and `DecodeEPCURI` expose the identifier
+fields. Supported coding schemes are SGTIN-96 and SGTIN-198 ((01) with
+(21)), SSCC-96 ((00)), SGLN-96 and SGLN-195 ((414) with (254)), GRAI-96 and
+GRAI-170 ((8003)) and GIAI-96 and GIAI-202 ((8004)), with check digits
+computed and partition tables per the EPC Tag Data Standard.
+
+```go
+b, _ := gs1.ParseEPC("3074257BF7194E4000001A85")
+b.Symbology      // gs1.SymEPC
+b.GTIN()         // "80614141123458"
+b.SerialNumber() // "6789"
+
+epc, _ := gs1.DecodeEPCURI("urn:epc:tag:sscc-96:3.0614141.1234567890")
+epc.Scheme, epc.Bits, epc.Filter // sscc 96 3
+epc.URI()      // "urn:epc:id:sscc:0614141.1234567890"
+epc.Elements() // [{00 106141412345678908}]
+```
+
+Writing tags is out of scope.
+
 ### Association rules
 
 `Parse` remains lenient for scanner workflows. Use `Barcode.ValidateAssociations()`
@@ -326,6 +350,8 @@ gs1 parse -check-digits "0104150000021126"              # GTIN check digits
 gs1 parse -strict -check-digits "0104150000021126"      # both semantic checks
 gs1 parse -validate anvisa "$SCAN"                     # exit 1 if non-compliant
 cat scans.txt | gs1 parse -json                        # one JSON object per line
+gs1 epc 3074257BF7194E4000001A85                       # RFID tag to element string
+gs1 epc -json "urn:epc:tag:sscc-96:3.0614141.1234567890"
 gs1 gtin 04150000021126                                # check digit
 gs1 ai 3102                                            # AI (3102)  Net Weight kg  N6
 ```
@@ -342,6 +368,7 @@ The same parser runs in browsers, Electron and edge runtimes.
 ```bash
 make wasm   # produces wasm/gs1.wasm and a servable example under wasm/example/
 node wasm/check-digits.test.mjs  # optional Node runtime validation of that build
+node wasm/epc.test.mjs           # same, for parseEPC()
 ```
 
 ```html
@@ -356,6 +383,8 @@ node wasm/check-digits.test.mjs  # optional Node runtime validation of that buil
   r.gtin;            // "04150000021126"
   r.expirationDate;  // "2025-02-01"
   r.warnings;         // parser advisories such as due-date-as-expiry
+
+  gs1.parseEPC("3074257BF7194E4000001A85");      // { gtin: "80614141123458", serial: "6789", epc: { scheme: "sgtin", bits: 96, filter: 3, ... } }
 
   gs1.validateGTIN("04150000021126");            // true
   gs1.validateRegulatory(scan, "anvisa");       // null when compliant, else message
