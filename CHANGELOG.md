@@ -7,8 +7,26 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Changed
+
+- Strict association validation applies the complete dictionary rules, so
+  inputs such as (12) without (8020) or (10) without an item key now fail
+  under `ValidateAssociations`. Lenient parsing is unchanged.
+- Twelve-digit input whose leading AI cannot fit its fixed data, such as
+  `010415000002`, parses as a bare UPC-A instead of a truncated AI (01).
+- Association error messages name the AI and alternatives from the
+  dictionary, e.g. `AI (3102) excludes AI (3103)`.
+
 ### Added
 
+- The AI table is generated from the GS1 Barcode Syntax Dictionary
+  (release 2026-01-27, Apache 2.0) by `go generate`, growing from 63 to 541
+  Application Identifiers with typed components, predefined-length flags,
+  Digital Link attributes and the dictionary's `req`/`ex` association rules.
+  `ValidateAssociations` evaluates those rules for every AI; `LookupAI`
+  reports `Title` and `Predefined` and renders `Format` in dictionary
+  notation; `SyntaxDictionaryRelease()` exposes the release. CI fails when
+  the committed table differs from the dictionary.
 - Opt-in GTIN check-digit validation for AI 01 and AI 02 through
   `ParseOptions.ValidateCheckDigits`, CLI `-check-digits`, and WASM
   `validateCheckDigits`, independently of association validation.

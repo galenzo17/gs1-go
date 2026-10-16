@@ -499,7 +499,7 @@ func variableCarrierPayload(data string) (string, bool, error) {
 }
 
 // extractData reads the data field for an AI starting at pos.
-func extractData(data string, pos int, spec aiSpec) (string, int, error) {
+func extractData(data string, pos int, spec *aiSpec) (string, int, error) {
 	if spec.FixedLen > 0 {
 		if pos+spec.FixedLen > len(data) {
 			return "", pos, fmt.Errorf("%w: AI (%s) needs %d chars, got %d",
@@ -539,49 +539,94 @@ func extractData(data string, pos int, spec aiSpec) (string, int, error) {
 	return value, newPos, nil
 }
 
-// validateData checks that the value conforms to the AI's data type.
-func validateData(value string, spec aiSpec) error {
-	if spec.DataType == dataUIC {
-		if len(value) != 4 || value[0] < '0' || value[0] > '9' {
-			return fmt.Errorf("%w: AI (%s) expects N1 + X3 data, got %q",
-				ErrInvalidData, spec.AI, value)
+// validateData applies the AI's components to the value in order, each
+// consuming a prefix of the prescribed length, and checks the character set
+// of every component. Optional components are skipped once the data is
+// exhausted; data left after the last component is an error.
+func validateData(value string, spec *aiSpec) error {
+	pos := 0
+	for _, c := range spec.Components {
+		remaining := len(value) - pos
+		if remaining == 0 && c.Optional {
+			break
 		}
-		return nil
+		n := c.Len
+		if c.Variable {
+			n = min(remaining, c.Len)
+			if n == 0 {
+				return fmt.Errorf("%w: AI (%s) needs at least %d characters, got %d",
+					ErrInvalidData, spec.AI, spec.MinLen, len(value))
+			}
+		} else if remaining < n {
+			return fmt.Errorf("%w: AI (%s) needs at least %d characters, got %d",
+				ErrInvalidData, spec.AI, spec.MinLen, len(value))
+		}
+		segment := value[pos : pos+n]
+		if err := validateCharset(segment, c.Type, spec); err != nil {
+			return err
+		}
+		for _, linter := range c.Linters {
+			if linter == "zero" && !isZeros(segment) {
+				return fmt.Errorf("%w: AI (%s) must start with %q, got %q",
+					ErrInvalidData, spec.AI, "0", segment)
+			}
+		}
+		pos += n
 	}
-	if err := validateNumericPrefix(value, spec); err != nil {
-		return err
+	if pos < len(value) {
+		return fmt.Errorf("%w: AI (%s) data length %d exceeds format %s",
+			ErrInvalidData, spec.AI, len(value), spec.format())
 	}
-	if spec.DataType != dataNumeric {
-		return nil
-	}
-	for i := 0; i < len(value); i++ {
-		if value[i] < '0' || value[i] > '9' {
-			return fmt.Errorf("%w: AI (%s) expects numeric data, got %q",
-				ErrInvalidData, spec.AI, value)
+	return nil
+}
+
+func validateCharset(segment string, t dataType, spec *aiSpec) error {
+	for i := 0; i < len(segment); i++ {
+		if !inCharset(segment[i], t) {
+			return fmt.Errorf("%w: AI (%s) expects %s data, got %q",
+				ErrInvalidData, spec.AI, t.description(), segment)
 		}
 	}
 	return nil
 }
 
-func validateNumericPrefix(value string, spec aiSpec) error {
-	if spec.NumericPrefixLen == 0 {
-		return nil
+// inCharset reports whether c belongs to the dictionary character set t.
+// Set 82 is checked by Encode; the parser accepts any byte for X so that
+// scanner output with stray characters still yields structured elements.
+func inCharset(c byte, t dataType) bool {
+	switch t {
+	case dataNumeric:
+		return isDigit(c)
+	case dataCSET39:
+		return isDigit(c) || isUpper(c) || c == '#' || c == '-' || c == '/'
+	case dataBase64URL:
+		return isDigit(c) || isUpper(c) || c >= 'a' && c <= 'z' || c == '-' || c == '_'
 	}
-	if len(value) < spec.NumericPrefixLen {
-		return fmt.Errorf("%w: AI (%s) needs at least %d characters, got %d",
-			ErrInvalidData, spec.AI, spec.NumericPrefixLen, len(value))
+	return true
+}
+
+func isDigit(c byte) bool { return c >= '0' && c <= '9' }
+func isUpper(c byte) bool { return c >= 'A' && c <= 'Z' }
+
+func (t dataType) description() string {
+	switch t {
+	case dataNumeric:
+		return "numeric"
+	case dataCSET39:
+		return "character set 39"
+	case dataBase64URL:
+		return "base64url"
 	}
-	if spec.FirstChar != 0 && value[0] != spec.FirstChar {
-		return fmt.Errorf("%w: AI (%s) must start with %q, got %q",
-			ErrInvalidData, spec.AI, spec.FirstChar, value[0])
-	}
-	for i := 0; i < spec.NumericPrefixLen; i++ {
-		if value[i] < '0' || value[i] > '9' {
-			return fmt.Errorf("%w: AI (%s) expects a numeric prefix, got %q",
-				ErrInvalidData, spec.AI, value)
+	return "character set 82"
+}
+
+func isZeros(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] != '0' {
+			return false
 		}
 	}
-	return nil
+	return true
 }
 
 // stripBracketNotation converts bracket notation "(01)0415...(17)250630"
@@ -640,8 +685,10 @@ func isBareGTIN(data string, assumeGTIN8 bool) bool {
 	if n == 8 && assumeGTIN8 {
 		return true
 	}
+	// A leading pair that is an AI whose data could fit in the remaining
+	// digits makes the input ambiguous; the check digit then decides.
 	if n >= 2 {
-		if _, ok := aiTable[data[0:2]]; ok {
+		if spec, ok := aiTable[data[0:2]]; ok && (spec.FixedLen == 0 || spec.FixedLen <= n-2) {
 			return ValidateGTIN(data) == nil
 		}
 	}
@@ -662,47 +709,60 @@ func isDigits(data string) bool {
 
 // findAIBoundary scans data[from:to] for the best AI boundary when FNC1
 // separators are missing. Among all candidates where the remaining data
-// can be fully parsed, it picks the one closest to the midpoint of the
-// search range. This "balanced split" heuristic avoids false positives
-// when AI codes like "21" appear inside lot numbers (e.g., "HC23L25212800"
-// contains "21" at multiple positions).
+// can be fully parsed, it prefers the split that yields the fewest
+// elements, since a single dropped separator leaves one trailing element,
+// and then the candidate closest to the midpoint of the search range. This
+// "balanced split" avoids false positives when AI codes like "21" appear
+// inside lot numbers (e.g., "HC23L25212800" contains "21" at multiple
+// positions), and the element count keeps digit runs from being read as
+// chains of short numeric AIs.
 func findAIBoundary(data string, from, to int) (int, bool) {
 	mid := (from + to) / 2
-	bestPos := -1
-	bestDist := len(data)
-	bestAILen := 0
+	best := boundaryCandidate{pos: -1, dist: len(data)}
 	for i := from; i < to; i++ {
 		spec, aiLen, ok := lookupAIAt(data, i)
+		if !ok || !plausibleAIData(data, i+aiLen, spec) {
+			continue
+		}
+		count, ok := canParseFrom(data, i)
 		if !ok {
 			continue
 		}
-		if !plausibleAIData(data, i+aiLen, spec) {
-			continue
-		}
-		if !canParseFrom(data, i) {
-			continue
-		}
-		dist := i - mid
-		if dist < 0 {
-			dist = -dist
-		}
-		preferShortAI := aiLen == 2 && bestAILen > 2
-		preferCandidate := bestAILen == 0 || preferShortAI ||
-			(aiLen == bestAILen && (dist < bestDist || (dist == bestDist && i > bestPos)))
-		if preferCandidate {
-			bestPos = i
-			bestDist = dist
-			bestAILen = aiLen
+		candidate := boundaryCandidate{pos: i, dist: max(i-mid, mid-i), aiLen: aiLen, count: count}
+		if best.pos < 0 || candidate.betterThan(best) {
+			best = candidate
 		}
 	}
-	if bestPos >= 0 {
-		return bestPos, true
+	if best.pos >= 0 {
+		return best.pos, true
 	}
 	return 0, false
 }
 
+// boundaryCandidate is one possible AI boundary during missing-FNC1
+// recovery.
+type boundaryCandidate struct {
+	pos, dist, aiLen, count int
+}
+
+// betterThan ranks candidates: fewer resulting elements first, then a
+// 2-digit AI over a longer one, then the position nearest the midpoint of
+// the search range, and on a tie the later position.
+func (c boundaryCandidate) betterThan(best boundaryCandidate) bool {
+	if c.count != best.count {
+		return c.count < best.count
+	}
+	if c.aiLen == 2 && best.aiLen > 2 {
+		return true
+	}
+	if c.aiLen != best.aiLen {
+		return false
+	}
+	return c.dist < best.dist || (c.dist == best.dist && c.pos > best.pos)
+}
+
 // plausibleAIData checks whether the data after a candidate AI looks valid.
-func plausibleAIData(data string, dataStart int, spec aiSpec) bool {
+func plausibleAIData(data string, dataStart int, spec *aiSpec) bool {
 	if !validAIDataPrefix(data, dataStart, spec) {
 		return false
 	}
@@ -724,9 +784,10 @@ func plausibleAIData(data string, dataStart int, spec aiSpec) bool {
 }
 
 // canParseFrom does a dry-run parse from pos to end-of-string to verify
-// that the remaining data contains valid AI-value pairs. No FNC1 recovery
-// is attempted in the dry run — only exact matches.
-func canParseFrom(data string, pos int) bool {
+// that the remaining data contains valid AI-value pairs, and counts them.
+// No FNC1 recovery is attempted in the dry run — only exact matches.
+func canParseFrom(data string, pos int) (int, bool) {
+	count := 0
 	for pos < len(data) {
 		if data[pos] == byte(fnc1) {
 			pos++
@@ -734,15 +795,15 @@ func canParseFrom(data string, pos int) bool {
 		}
 		spec, aiLen, ok := lookupAIAt(data, pos)
 		if !ok {
-			return false
+			return 0, false
 		}
 		pos += aiLen
 		if !validAIDataPrefix(data, pos, spec) {
-			return false
+			return 0, false
 		}
 		if spec.FixedLen > 0 {
 			if !validFixedField(data, pos, spec) {
-				return false
+				return 0, false
 			}
 			pos += spec.FixedLen
 		} else {
@@ -751,32 +812,47 @@ func canParseFrom(data string, pos int) bool {
 				end++
 			}
 			if end == pos || end-pos > spec.MaxLen {
-				return false
+				return 0, false
 			}
 			pos = end
 			if pos < len(data) && data[pos] == byte(fnc1) {
 				pos++
 			}
 		}
+		count++
+	}
+	return count, true
+}
+
+// validAIDataPrefix reports whether the data after a candidate AI fits the
+// AI's leading fixed components, so that missing-FNC1 recovery does not
+// split on digits that merely look like an AI code.
+func validAIDataPrefix(data string, dataStart int, spec *aiSpec) bool {
+	pos := dataStart
+	for _, c := range spec.Components {
+		if c.Variable || c.Optional {
+			break
+		}
+		if pos+c.Len > len(data) {
+			return false
+		}
+		segment := data[pos : pos+c.Len]
+		for i := 0; i < len(segment); i++ {
+			if !inCharset(segment[i], c.Type) {
+				return false
+			}
+		}
+		for _, linter := range c.Linters {
+			if linter == "zero" && !isZeros(segment) {
+				return false
+			}
+		}
+		pos += c.Len
 	}
 	return true
 }
 
-func validAIDataPrefix(data string, dataStart int, spec aiSpec) bool {
-	if spec.NumericPrefixLen > 0 {
-		if dataStart+spec.NumericPrefixLen > len(data) {
-			return false
-		}
-		for i := dataStart; i < dataStart+spec.NumericPrefixLen; i++ {
-			if data[i] < '0' || data[i] > '9' {
-				return false
-			}
-		}
-	}
-	return spec.FirstChar == 0 || (dataStart < len(data) && data[dataStart] == spec.FirstChar)
-}
-
-func validFixedField(data string, pos int, spec aiSpec) bool {
+func validFixedField(data string, pos int, spec *aiSpec) bool {
 	if pos+spec.FixedLen > len(data) {
 		return false
 	}

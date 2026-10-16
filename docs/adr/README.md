@@ -16,3 +16,4 @@ supersedes it.
 | [0006](0006-missing-fnc1-recovery.md) | Missing FNC1 recovery heuristic | Accepted |
 | [0007](0007-date-parsing-options.md) | Configurable day-zero date policy | Accepted |
 | [0008](0008-check-digit-validation.md) | Opt-in GTIN check-digit validation | Accepted |
+| [0011](0011-generated-ai-table.md) | Generate the AI table and association rules from the GS1 Syntax Dictionary | Accepted |

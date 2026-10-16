@@ -54,10 +54,10 @@ where applicable, check digit validated.
 | 1.24 | GSRN | 8018 | Recommended | Gap | Not in table; 8017 added alongside (#8). |
 | 1.25 | GINC | 401 | Recommended | Gap | Not in table (#8). |
 
-Cross-cutting: the module knows 63 AIs. Any other AI fails with
-`ErrUnknownAI`. Generating the full table from the GS1 Syntax Dictionary
-(#14) closes this for every future audit, and association rules between AIs
-such as (02) with (37) are tracked in #13.
+Cross-cutting: the AI table is generated from the GS1 Barcode Syntax
+Dictionary release 2026-01-27 (541 AIs, #14), and the association rules are
+the dictionary's `req`/`ex` attributes evaluated for every AI (#13, #14). A
+newer dictionary release is a file replacement plus `make generate`.
 
 ## 2. Symbologies
 
@@ -85,7 +85,7 @@ Printing symbols (checklist wording "impresión") is covered under 3.5 and track
 | # | Item | Type | Status | Notes / issue |
 |---|---|---|---|---|
 | 3.1 | Compatible with Wi-Fi data capture devices (mobile computers, not only tethered scanners) | Required | Application layer | The parser is transport-agnostic: HID text, TCP streams and HTTP posts all feed `ParseInto`. Documented in the integration guide (#20). |
-| 3.2 | Read and process AIs: split and store internally | Required | Covered, rules gap | Elements in scan order, `Get`, typed accessors. Association rules (#13) and full table (#14) harden it. |
+| 3.2 | Read and process AIs: split and store internally | Required | Covered | Elements in scan order, `Get`, typed accessors. Full AI table and association rules generated from the Syntax Dictionary (#13, #14). |
 | 3.3 | Separate and store each AI as its own field, e.g. (02) GTIN, (10) lot, (17) expiry, (37) count | Required | Covered | `Barcode.Elements` plus accessors. Dates return `time.Time`. |
 | 3.4 | Place, manage and interpret FNC1 after variable-length AIs | Required | Covered | Reading side complete. Writing side (placing FNC1 when building strings) is the encoder in #16. |
 | 3.5 | Print, read and interpret 2D symbologies; print simple and logistic labels | Required | Gap | Reading is covered. Building the element string with correct AI order and FNC1 placement, plus HRI text, is #16. Rendering GS1-128, GS1 DataMatrix, GS1 QR, EAN/UPC and ITF-14 symbols and the logistic label layout (ZPL, SVG, image) is #24, which proposes superseding the no-generation clause of ADR 0002. |

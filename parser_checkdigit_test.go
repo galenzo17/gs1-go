@@ -236,7 +236,7 @@ func TestParseIntoCheckDigitsReuse(t *testing.T) {
 		wantSym  Symbology
 		warnings int
 	}{
-		{input: "]d2010415000002112612250630", wantSym: SymDataMatrix, warnings: 1},
+		{input: "]d2010415000002112617250630", wantSym: SymDataMatrix},
 		{input: "0104150000021127", wantErr: ErrInvalidCheckDigit, wantSym: SymUnknown},
 		{input: "]I012345678901231", wantSym: SymITF14},
 	}
