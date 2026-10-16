@@ -27,9 +27,14 @@ import (
 	"github.com/galenzo17/gs1-go"
 )
 
-// version is set by the linker for release builds; otherwise it is derived
-// from module build info.
-var version = ""
+// version, commit and date are set by the linker for release builds
+// (GoReleaser ldflags); otherwise the version is derived from module build
+// info.
+var (
+	version = ""
+	commit  = ""
+	date    = ""
+)
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
@@ -360,6 +365,9 @@ func runAI(args []string, stdout, stderr io.Writer) int {
 
 func resolveVersion() string {
 	if version != "" {
+		if commit != "" {
+			return fmt.Sprintf("%s (%s, %s)", version, commit, date)
+		}
 		return version
 	}
 	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
