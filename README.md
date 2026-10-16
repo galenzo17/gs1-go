@@ -350,6 +350,22 @@ independently checks GTIN check digits and returns the usual `{ error: string }`
 object on failure. The optional Node test uses the matching `wasm_exec.js`
 copied by `make wasm`; Node is not required by `make all`.
 
+## Conformance
+
+`make conformance` runs the test vectors that GS1 publishes with the
+[Barcode Syntax Engine](https://github.com/gs1/gs1-syntax-engine) (1.4.1)
+and the [Barcode Syntax Dictionary](https://github.com/gs1/gs1-syntax-dictionary)
+(2026-01-27) through this parser, vendored under
+[`testdata/gs1`](testdata/gs1/README.md) with their Apache 2.0 licences:
+bracket-notation parsing, AI data validation, association rules, scan data
+with symbology identifiers, and the dictionary linters this package
+implements. Each divergence from the reference is listed with its reason in
+[`known-divergences.txt`](testdata/gs1/known-divergences.txt): scanner
+tolerance kept on purpose, value linters that run only through the explicit
+options, and features such as unknown-AI passthrough or Digital Link URIs.
+The test fails on any new divergence and on any listed one that starts to
+agree, so the rate reported in CI moves only deliberately.
+
 ## Scope
 
 This library is a parsing and validation layer. It does not generate

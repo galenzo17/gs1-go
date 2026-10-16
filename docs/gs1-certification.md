@@ -89,7 +89,7 @@ Printing symbols (checklist wording "impresión") is covered under 3.5 and track
 | 3.3 | Separate and store each AI as its own field, e.g. (02) GTIN, (10) lot, (17) expiry, (37) count | Required | Covered | `Barcode.Elements` plus accessors. Dates return `time.Time`. |
 | 3.4 | Place, manage and interpret FNC1 after variable-length AIs | Required | Covered | Reading side complete. Writing side (placing FNC1 when building strings) is the encoder in #16. |
 | 3.5 | Print, read and interpret 2D symbologies; print simple and logistic labels | Required | Gap | Reading is covered. Building the element string with correct AI order and FNC1 placement, plus HRI text, is #16. Rendering GS1-128, GS1 DataMatrix, GS1 QR, EAN/UPC and ITF-14 symbols and the logistic label layout (ZPL, SVG, image) is #24, which proposes superseding the no-generation clause of ADR 0002. |
-| 3.6 | Samples and logistic labels validated with the local GS1 verifier | Required | Gap | Data conformance against GS1 Syntax Engine vectors is #18. Printed samples come from the renderers in #24 and are taken to the GS1 member organisation's verifier (ISO/IEC 15415/15416); reports are recorded in `testdata/labels/`. |
+| 3.6 | Samples and logistic labels validated with the local GS1 verifier | Required | Covered (data), print verification pending | Data conformance: `TestConformance` runs the GS1 Syntax Engine 1.4.1 and Syntax Dictionary 2026-01-27 vectors (#18), with documented divergences; `testdata/labels/` holds the logistic label element strings per carrier. Printed samples come from the renderers in #24 and are taken to the GS1 member organisation's verifier (ISO/IEC 15415/15416); reports are recorded in `testdata/labels/`. |
 
 ## 4. Reports compatible with global standards
 
