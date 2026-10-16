@@ -110,3 +110,101 @@ func ExampleLookupAI() {
 	// Output:
 	// true Net Weight kg N6
 }
+
+func ExampleParseWithOptions() {
+	// Strict parsing enforces AI association rules and GTIN check digits.
+	_, err := gs1.ParseWithOptions("0204150000021126", gs1.ParseOptions{ValidateAssociations: true})
+	fmt.Println(err)
+
+	_, err = gs1.ParseWithOptions("0104150000021127", gs1.ParseOptions{ValidateCheckDigits: true})
+	fmt.Println(errors.Is(err, gs1.ErrInvalidCheckDigit))
+	// Output:
+	// gs1: invalid AI association: AI (02) requires AI (37)
+	// true
+}
+
+func ExampleBarcode_ValidateAssociations() {
+	b, _ := gs1.Parse("0104150000021126" + "3720")
+	fmt.Println(b.ValidateAssociations())
+
+	b, _ = gs1.Parse("00106141411234567897" + "0204150000021126" + "3720")
+	fmt.Println(b.ValidateAssociations())
+	// Output:
+	// gs1: invalid AI association: AI (01) excludes AI (37)
+	// <nil>
+}
+
+func ExampleBarcode_Validate() {
+	b, _ := gs1.Parse("0104150000021127")
+	fmt.Println(errors.Is(b.Validate(), gs1.ErrInvalidCheckDigit))
+	// Output:
+	// true
+}
+
+func ExampleBarcode_HRI() {
+	b, _ := gs1.Parse("0104150000021126172506301012345")
+	fmt.Println(b.HRI())
+	// Output:
+	// (01)04150000021126(17)250630(10)12345
+}
+
+func ExampleNewSSCC() {
+	sscc, err := gs1.NewSSCC('3', "7801234", "000000009")
+	fmt.Println(sscc, err)
+
+	extension, companyPrefix, serialReference, _ := gs1.SplitSSCC(sscc, 7)
+	fmt.Printf("%c %s %s\n", extension, companyPrefix, serialReference)
+	// Output:
+	// 378012340000000095 <nil>
+	// 3 7801234 000000009
+}
+
+func ExampleNewGTIN14() {
+	gtin13, _ := gs1.NewGTIN13("7801234", "00005")
+	caseGTIN, _ := gs1.NewGTIN14('1', gtin13)
+	fmt.Println(gtin13, caseGTIN)
+	// Output:
+	// 7801234000056 17801234000053
+}
+
+func ExampleExpandUPCE() {
+	upca, err := gs1.ExpandUPCE("012345")
+	fmt.Println(upca, err)
+	// Output:
+	// 001234000057 <nil>
+}
+
+func ExampleComputeGTINCheckDigit() {
+	check, _ := gs1.ComputeGTINCheckDigit("0415000002112")
+	fmt.Printf("%c\n", check)
+	// Output:
+	// 6
+}
+
+func ExampleBarcode_NetWeightKg() {
+	b, _ := gs1.Parse("0104150000021126" + "3102001500")
+	weight, ok := b.NetWeightKg()
+	fmt.Println(ok, weight.Value, weight.Unit, weight.Raw, weight.Decimals)
+	// Output:
+	// true 15 kg 001500 2
+}
+
+func ExampleBarcode_Warnings() {
+	b, _ := gs1.Parse("0104150000021126" + "12250630")
+	for _, w := range b.Warnings() {
+		fmt.Println(w.Code, w.Message)
+	}
+	// Output:
+	// due_date_as_expiry AI (12) is a due date; use AI (17) for expiration dates
+}
+
+func ExampleParseDateRaw() {
+	raw, err := gs1.ParseDateRaw("250200")
+	fmt.Println(raw, err)
+
+	_, err = gs1.ParseDateRaw("251340")
+	fmt.Println(errors.Is(err, gs1.ErrInvalidDate))
+	// Output:
+	// 250200 <nil>
+	// true
+}
