@@ -239,6 +239,31 @@ func TestParseCheckDigitsReportsKeyAIAndPosition(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsShortKeyPrefixes(t *testing.T) {
+	tests := []struct {
+		name     string
+		elements []Element
+		wantErr  error
+	}{
+		{name: "short GDTI", elements: []Element{{AI: "253", Value: "123"}}, wantErr: ErrInvalidData},
+		{name: "short GRAI", elements: []Element{{AI: "8003", Value: "0123"}}, wantErr: ErrInvalidData},
+		{name: "short SSCC", elements: []Element{{AI: "00", Value: "123"}}, wantErr: ErrInvalidData},
+		{name: "GDTI key only", elements: []Element{{AI: "253", Value: "0614141000012"}}},
+		{name: "GRAI key only", elements: []Element{{AI: "8003", Value: "00614141000012"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := (Barcode{Elements: tt.elements}).Validate()
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("Validate() error = %v, want %v", err, tt.wantErr)
+			}
+			if errors.Is(err, ErrInvalidCheckDigit) {
+				t.Errorf("Validate() error = %v, want a length error, not a check-digit error", err)
+			}
+		})
+	}
+}
+
 func TestEncodeValidatesKeyCheckDigits(t *testing.T) {
 	tests := []struct {
 		name    string

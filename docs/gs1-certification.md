@@ -128,7 +128,7 @@ Reference implementations: GS1 XML 3.x schemas and EANCOM at
 
 | Section | Required rows | Covered | Gap | Application layer / out of scope |
 |---|---|---|---|---|
-| 1. Keys | 20 | 10 | 10 | 0 |
+| 1. Keys | 20 | 20 | 5 | 0 |
 | 2. Symbologies | 8 | 5 | 3 | 0 |
 | 3. Processing | 6 | 3 | 2 | 1 |
 | 4. Reports | 5 | 0 | 0 | 5 |

@@ -159,11 +159,12 @@ func validateElementCheckDigit(element Element) error {
 }
 
 // validateKeyPrefix validates the check digit of the numeric key embedded in
-// value[start:end]. Values too short to hold the key are left to the length
-// checks that run before check digits.
+// value[start:end]. The parser and encoder check lengths before check
+// digits, so a short value here can only come from a hand-built Barcode
+// passed to Validate; it is rejected rather than silently skipped.
 func validateKeyPrefix(value string, start, end int) error {
 	if len(value) < end {
-		return nil
+		return fmt.Errorf("%w: key needs at least %d digits, got %d", ErrInvalidData, end, len(value))
 	}
 	return ValidateCheckDigit(value[start:end])
 }
