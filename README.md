@@ -37,7 +37,8 @@ b.GSIN() // "12345678901234567"
   (ASCII 29) separators, bracket notation `(01)…(17)…`, AIM symbology
   identifiers (`]C1`, `]d2`, `]Q3`, `]e0`, `]J1`, `]E`, `]I`) and bare EAN-13 / UPC-A / GTIN-14.
 - **Element string encoding** with canonical fixed-AI ordering, FNC1 placement,
-  and human-readable interpretation through `Barcode.HRI()`.
+  association and check-digit enforcement, ZPL `^FD` output, and
+  human-readable interpretation through `Barcode.HRI()`.
 - **Carrier detection** through `Barcode.Symbology`, including EAN/UPC and ITF-14.
 - **Scanner resilience by default.** UTF-8 BOM, CR/LF, NUL bytes and
   duplicated FNC1 from keyboard-wedge and USB HID scanners are normalized
@@ -194,6 +195,44 @@ caseGTIN, _ := gs1.NewGTIN14('1', gtin13)
 to recover the SSCC components. Allocation counters and persistence remain
 the application's responsibility.
 
+### Encoding for label printing
+
+`Encode` builds the element string a barcode generator needs from AI/value
+pairs: predefined-length AIs first so they need no separator, FNC1 (ASCII GS)
+before every other AI, and a leading FNC1 marking the GS1 payload. It
+enforces the same rules as strict parsing, so a string it accepts parses with
+`ValidateAssociations` and `ValidateCheckDigits`: values are checked against
+their AI format and character set 82, duplicates and wrong check digits are
+rejected, and association rules such as `(02)` requiring `(00)` and `(37)`
+apply.
+
+```go
+elements := []gs1.Element{
+    {AI: "10", Value: "ABC123"},
+    {AI: "00", Value: "790123451234500116"},
+    {AI: "02", Value: "49012345008794"},
+    {AI: "37", Value: "12"},
+}
+raw, err := gs1.Encode(elements)
+// "\x1D00790123451234500116" + "0249012345008794" + "10ABC123" + "\x1D3712"
+
+zpl, err := gs1.EncodeZPL(elements)
+// ">800790123451234500116" + "0249012345008794" + "10ABC123" + ">83712"
+// ^BCN,100,Y,N,N,A^FD<zpl>^FS
+
+b, _ := gs1.Parse(raw)
+b.HRI() // "(00)790123451234500116(02)49012345008794(10)ABC123(37)12"
+```
+
+`ParseHRI` is the inverse of `Barcode.HRI()` for encoder input typed by
+people or stored in label templates: it splits bracket notation literally,
+without the AI table or scanner heuristics of `Parse`, so a mistyped AI
+reaches `Encode` and fails as `ErrUnknownAI`.
+
+`EncodeZPL` writes every FNC1 as the Code 128 invocation code `>8` and a
+literal `>` as `><`, for the `^BC` command in automatic mode. GS1 DataMatrix
+(`^BX`) uses a different FNC1 escape and is not covered.
+
 ### Association rules
 
 `Parse` remains lenient for scanner workflows. Use `Barcode.ValidateAssociations()`
@@ -326,6 +365,9 @@ gs1 parse -check-digits "0104150000021126"              # GTIN check digits
 gs1 parse -strict -check-digits "0104150000021126"      # both semantic checks
 gs1 parse -validate anvisa "$SCAN"                     # exit 1 if non-compliant
 cat scans.txt | gs1 parse -json                        # one JSON object per line
+gs1 encode "(10)LOT42(01)04150000021126"               # raw string, FNC1 as ASCII GS
+gs1 encode -hri "(10)LOT42(01)04150000021126"          # (01)04150000021126(10)LOT42
+gs1 encode -zpl "(10)LOT42(01)04150000021126"          # >8010415000002112610LOT42
 gs1 gtin 04150000021126                                # check digit
 gs1 ai 3102                                            # AI (3102)  Net Weight kg  N6
 ```
@@ -342,6 +384,7 @@ The same parser runs in browsers, Electron and edge runtimes.
 ```bash
 make wasm   # produces wasm/gs1.wasm and a servable example under wasm/example/
 node wasm/check-digits.test.mjs  # optional Node runtime validation of that build
+node wasm/encode.test.mjs        # same, for encode()
 ```
 
 ```html
@@ -356,6 +399,9 @@ node wasm/check-digits.test.mjs  # optional Node runtime validation of that buil
   r.gtin;            // "04150000021126"
   r.expirationDate;  // "2025-02-01"
   r.warnings;         // parser advisories such as due-date-as-expiry
+
+  gs1.encode([{ ai: "10", value: "LOT42" }, { ai: "01", value: "04150000021126" }]);
+  // { raw: "\x1D010415000002112610LOT42", hri: "(01)04150000021126(10)LOT42", zpl: ">8010415000002112610LOT42" }
 
   gs1.validateGTIN("04150000021126");            // true
   gs1.validateRegulatory(scan, "anvisa");       // null when compliant, else message
