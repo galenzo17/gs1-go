@@ -19,6 +19,15 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ### Added
 
+- Conformance suite against the GS1 Barcode Syntax Engine 1.4.1 and Syntax
+  Dictionary 2026-01-27 test vectors, vendored under `testdata/gs1` with
+  their licences: 1281 vectors run through the parser, 92% agree, and the
+  100 documented divergences in `known-divergences.txt` must change
+  deliberately. `make conformance` and a CI job report the rate.
+  `ValidateAssociations` rejects an AI repeated with different values, the
+  encoder enforces character set 82 exactly, and base64url components
+  accept standard padding. `testdata/labels` holds logistic label element
+  strings per carrier.
 - The AI table is generated from the GS1 Barcode Syntax Dictionary
   (release 2026-01-27, Apache 2.0) by `go generate`, growing from 63 to 541
   Application Identifiers with typed components, predefined-length flags,

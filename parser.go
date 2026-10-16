@@ -581,6 +581,12 @@ func validateData(value string, spec *aiSpec) error {
 }
 
 func validateCharset(segment string, t dataType, spec *aiSpec) error {
+	if t == dataBase64URL {
+		if err := validateBase64URL(segment); err != nil {
+			return fmt.Errorf("%w: AI (%s) expects base64url data, got %q", ErrInvalidData, spec.AI, segment)
+		}
+		return nil
+	}
 	for i := 0; i < len(segment); i++ {
 		if !inCharset(segment[i], t) {
 			return fmt.Errorf("%w: AI (%s) expects %s data, got %q",
@@ -588,6 +594,34 @@ func validateCharset(segment string, t dataType, spec *aiSpec) error {
 		}
 	}
 	return nil
+}
+
+// validateBase64URL applies the dictionary's cset64 rule: base64url
+// characters, optionally followed by at most two "=" padding characters,
+// in which case the total length must be a multiple of three.
+func validateBase64URL(segment string) error {
+	data := strings.TrimRight(segment, "=")
+	pads := len(segment) - len(data)
+	if pads > 2 || (pads > 0 && len(segment)%3 != 0) {
+		return fmt.Errorf("%w: invalid base64url padding", ErrInvalidData)
+	}
+	for i := 0; i < len(data); i++ {
+		if !inCharset(data[i], dataBase64URL) {
+			return fmt.Errorf("%w: byte %q is not base64url", ErrInvalidData, data[i])
+		}
+	}
+	return nil
+}
+
+// inCSET82 reports whether c belongs to GS1 AI encodable character set 82
+// (GS1 General Specifications figure 7.11-1): digits, upper- and lowercase
+// letters, and !"%&'()*+,-./:;<=>?_.
+func inCSET82(c byte) bool {
+	switch {
+	case isDigit(c), isUpper(c), c >= 'a' && c <= 'z':
+		return true
+	}
+	return strings.IndexByte("!\"%&'()*+,-./:;<=>?_", c) >= 0
 }
 
 // inCharset reports whether c belongs to the dictionary character set t.
@@ -621,6 +655,9 @@ func (t dataType) description() string {
 }
 
 func isZeros(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
 	for i := 0; i < len(s); i++ {
 		if s[i] != '0' {
 			return false

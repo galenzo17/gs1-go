@@ -72,9 +72,11 @@ func validateEncodeElement(element Element, index int, seen map[string]struct{})
 	return nil
 }
 
+// validateEncodableValue restricts values to GS1 AI encodable character set
+// 82 minus the parentheses, so that the HRI stays parseable.
 func validateEncodableValue(value, ai string) error {
 	for i := 0; i < len(value); i++ {
-		if value[i] <= 0x20 || value[i] > 0x7e || value[i] == '(' || value[i] == ')' {
+		if !inCSET82(value[i]) || value[i] == '(' || value[i] == ')' {
 			return fmt.Errorf("%w: AI (%s) contains unsupported character at position %d", ErrInvalidData, ai, i)
 		}
 	}

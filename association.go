@@ -10,10 +10,17 @@ import (
 // every AI present: each "req" group needs at least one of its alternatives
 // (an alternative such as "01+21" needs every listed AI), and an "ex"
 // pattern must not match any other AI. Patterns use "n" as a digit
-// wildcard, so 3102 with 3103 fails on "310n". Elements are checked in
-// order and the first violation is returned.
+// wildcard, so 3102 with 3103 fails on "310n". An AI that appears more
+// than once must carry the same value every time, as the GS1 Syntax Engine
+// requires. Elements are checked in order and the first violation is
+// returned.
 func (b Barcode) ValidateAssociations() error {
-	for _, element := range b.Elements {
+	for i, element := range b.Elements {
+		for _, other := range b.Elements[i+1:] {
+			if other.AI == element.AI && other.Value != element.Value {
+				return associationError("AI (%s) repeated with different values %q and %q", element.AI, element.Value, other.Value)
+			}
+		}
 		spec, ok := aiTable[element.AI]
 		if !ok {
 			continue

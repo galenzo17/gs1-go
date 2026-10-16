@@ -204,7 +204,8 @@ func TestBarcodeValidateUsesCurrentElements(t *testing.T) {
 		{name: "bad elements override valid Raw", raw: "0104150000021126", elements: []Element{{AI: "01", Value: "04150000021127"}}, wantErr: ErrInvalidCheckDigit},
 		{name: "content GTIN", elements: []Element{{AI: "00"}, {AI: "02", Value: "04150000021127"}, {AI: "37"}}, wantErr: ErrInvalidCheckDigit},
 		{name: "association priority", elements: []Element{{AI: "02", Value: "04150000021127"}}, wantErr: ErrInvalidAssociation},
-		{name: "later duplicate GTIN", elements: []Element{{AI: "01", Value: "04150000021126"}, {AI: "01", Value: "04150000021127"}}, wantErr: ErrInvalidCheckDigit},
+		{name: "repeated GTIN with same bad value", elements: []Element{{AI: "01", Value: "04150000021127"}, {AI: "01", Value: "04150000021127"}}, wantErr: ErrInvalidCheckDigit},
+		{name: "repeated GTIN with different values", elements: []Element{{AI: "01", Value: "04150000021126"}, {AI: "01", Value: "04150000021127"}}, wantErr: ErrInvalidAssociation},
 		{name: "malformed element", elements: []Element{{AI: "01", Value: "123"}}, wantErr: ErrInvalidData},
 		{name: "other keys are out of scope", raw: "malformed", elements: []Element{{AI: "00", Value: "00012345678901234567"}}},
 	}
