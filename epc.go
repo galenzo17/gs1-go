@@ -244,7 +244,68 @@ func decodeEPCBinary(coding epcCoding, data []byte) (EPC, error) {
 	if !r.restIsZero() {
 		return EPC{}, fmt.Errorf("%w: %s has non-zero bits after position %d", ErrInvalidData, coding.name, r.pos)
 	}
-	return epc, nil
+	return epc, epc.checkAILengths()
+}
+
+// checkAILengths rejects identifiers whose element string would exceed the
+// GS1 AI limits: 20 characters for the (21) serial and the (254) extension,
+// 16 for the GRAI serial, 30 for the whole GIAI. A 12-digit company prefix
+// in GIAI-202 leaves room for 21 encoded characters, but TDS allows 18.
+func (e EPC) checkAILengths() error {
+	switch e.Scheme {
+	case EPCSGTIN, EPCSGLN:
+		if len(e.Serial) > 20 {
+			return fmt.Errorf("%w: %s serial %q exceeds 20 characters", ErrInvalidData, e.Scheme, e.Serial)
+		}
+	case EPCGRAI:
+		if len(e.Serial) > 16 {
+			return fmt.Errorf("%w: grai serial %q exceeds 16 characters", ErrInvalidData, e.Serial)
+		}
+	case EPCGIAI:
+		if len(e.CompanyPrefix)+len(e.Reference) > 30 {
+			return fmt.Errorf("%w: giai exceeds 30 characters", ErrInvalidData)
+		}
+	}
+	return nil
+}
+
+// checkCoding verifies that a tag URI's values fit the binary coding
+// scheme it names: numeric serials and the GIAI-96 reference must be
+// decimal without leading zeros and fit their bit field for the partition
+// implied by the company prefix length; alphanumeric fields are limited to
+// the characters the field can hold.
+func (c epcCoding) checkCoding(e EPC) error {
+	partition := 12 - len(e.CompanyPrefix)
+	layout := c.partitions[partition]
+	switch {
+	case c.scheme == EPCGIAI && c.alphanumeric:
+		return checkSevenBitFits(e.Reference, layout.refBits, c.name, "individual asset reference")
+	case c.scheme == EPCGIAI:
+		return checkDecimalFits(e.Reference, layout.refBits, c.name, "individual asset reference")
+	case c.serialBits == 0:
+		return nil
+	case c.alphanumeric:
+		return checkSevenBitFits(e.Serial, c.serialBits, c.name, "serial")
+	}
+	return checkDecimalFits(e.Serial, c.serialBits, c.name, "serial")
+}
+
+func checkDecimalFits(value string, bits int, coding, field string) error {
+	if !isDigits(value) || (len(value) > 1 && value[0] == '0') {
+		return fmt.Errorf("%w: %s %s %q must be a decimal without leading zeros", ErrInvalidData, coding, field, value)
+	}
+	v, err := strconv.ParseUint(value, 10, 64)
+	if err != nil || bits < 64 && v >= uint64(1)<<uint(bits) {
+		return fmt.Errorf("%w: %s %s %q does not fit in %d bits", ErrInvalidData, coding, field, value, bits)
+	}
+	return nil
+}
+
+func checkSevenBitFits(value string, bits int, coding, field string) error {
+	if len(value) > bits/7 {
+		return fmt.Errorf("%w: %s %s %q exceeds %d characters", ErrInvalidData, coding, field, value, bits/7)
+	}
+	return nil
 }
 
 func epcCodingByHeader(header byte) (epcCoding, bool) {
@@ -411,6 +472,9 @@ func decodeEPCTagURI(rest string) (EPC, error) {
 	if err != nil {
 		return EPC{}, err
 	}
+	if err := coding.checkCoding(epc); err != nil {
+		return EPC{}, err
+	}
 	epc.Bits = coding.bits
 	epc.Filter = int(filterText[0] - '0')
 	return epc, nil
@@ -460,8 +524,10 @@ func decodeEPCFields(scheme EPCScheme, fields string) (EPC, error) {
 	}
 	var err error
 	if scheme == EPCGIAI {
-		epc.Reference, err = decodeEPCSerial(parts[1], "individual asset reference")
-		return epc, err
+		if epc.Reference, err = decodeEPCSerial(parts[1], "individual asset reference"); err != nil {
+			return EPC{}, err
+		}
+		return epc, epc.checkAILengths()
 	}
 	epc.Reference = parts[1]
 	total := map[EPCScheme]int{EPCSGTIN: 13, EPCSSCC: 17, EPCSGLN: 12, EPCGRAI: 12}[scheme]
@@ -471,9 +537,11 @@ func decodeEPCFields(scheme EPCScheme, fields string) (EPC, error) {
 		return EPC{}, fmt.Errorf("%w: %s company prefix and reference must total %d digits", ErrInvalidData, scheme, total)
 	}
 	if want == 3 {
-		epc.Serial, err = decodeEPCSerial(parts[2], "serial")
+		if epc.Serial, err = decodeEPCSerial(parts[2], "serial"); err != nil {
+			return EPC{}, err
+		}
 	}
-	return epc, err
+	return epc, epc.checkAILengths()
 }
 
 // decodeEPCSerial unescapes a serial or asset reference component and

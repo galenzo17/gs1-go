@@ -187,6 +187,22 @@ func TestDecodeEPCURI(t *testing.T) {
 		{name: "non-numeric reference", uri: "urn:epc:id:sgtin:0614141.8123A5.6789", wantErr: ErrInvalidData},
 		{name: "empty serial", uri: "urn:epc:id:sgtin:0614141.812345.", wantErr: ErrInvalidData},
 		{name: "bad escape", uri: "urn:epc:id:sgtin:0614141.812345.6%ZZ", wantErr: ErrInvalidData},
+		{name: "sgtin-96 alphanumeric serial", uri: "urn:epc:tag:sgtin-96:3.0614141.812345.ABC", wantErr: ErrInvalidData},
+		{name: "sgtin-96 serial with leading zero", uri: "urn:epc:tag:sgtin-96:3.0614141.812345.0123", wantErr: ErrInvalidData},
+		{name: "sgtin-96 serial beyond 38 bits", uri: "urn:epc:tag:sgtin-96:3.0614141.812345.274877906944", wantErr: ErrInvalidData},
+		{name: "sgtin-96 serial at 38-bit maximum", uri: "urn:epc:tag:sgtin-96:3.0614141.812345.274877906943",
+			want:     EPC{Scheme: EPCSGTIN, Bits: 96, Filter: 3, CompanyPrefix: "0614141", Reference: "812345", Serial: "274877906943"},
+			elements: []Element{{AI: "01", Value: "80614141123458"}, {AI: "21", Value: "274877906943"}}},
+		{name: "sgtin-198 serial over 20 characters", uri: "urn:epc:tag:sgtin-198:3.0614141.812345.ABCDEFGHIJKLMNOPQRSTU", wantErr: ErrInvalidData},
+		{name: "sgtin pure identity serial over 20 characters", uri: "urn:epc:id:sgtin:0614141.812345.ABCDEFGHIJKLMNOPQRSTU", wantErr: ErrInvalidData},
+		{name: "sgln-96 alphanumeric extension", uri: "urn:epc:tag:sgln-96:3.0614141.12345.4a", wantErr: ErrInvalidData},
+		{name: "grai serial over 16 characters", uri: "urn:epc:id:grai:0614141.12345.ABCDEFGHIJKLMNOPQ", wantErr: ErrInvalidData},
+		{name: "grai-96 serial beyond 38 bits", uri: "urn:epc:tag:grai-96:3.0614141.12345.274877906944", wantErr: ErrInvalidData},
+		{name: "giai-96 alphanumeric reference", uri: "urn:epc:tag:giai-96:3.0614141.32a%2Fb", wantErr: ErrInvalidData},
+		{name: "giai-96 reference with leading zero", uri: "urn:epc:tag:giai-96:3.0614141.0123", wantErr: ErrInvalidData},
+		{name: "giai-96 reference beyond 58 bits", uri: "urn:epc:tag:giai-96:3.0614141.288230376151711744", wantErr: ErrInvalidData},
+		{name: "giai over 30 characters", uri: "urn:epc:id:giai:0614141.ABCDEFGHIJKLMNOPQRSTUVWX", wantErr: ErrInvalidData},
+		{name: "giai-202 reference beyond 30 characters total", uri: "urn:epc:tag:giai-202:3.061414112345.ABCDEFGHIJKLMNOPQRS", wantErr: ErrInvalidData},
 		{name: "control character in serial", uri: "urn:epc:id:giai:000000.000%09", wantErr: ErrInvalidData},
 		{name: "space in serial", uri: "urn:epc:id:sgtin:0614141.812345.6%2089", wantErr: ErrInvalidData},
 		{name: "hash in serial", uri: "urn:epc:id:sgtin:0614141.812345.6#9", wantErr: ErrInvalidData},
@@ -218,6 +234,20 @@ func TestDecodeEPCURI(t *testing.T) {
 				t.Errorf("DecodeEPCURI(URI()) = %+v, %v, want the same identifier", again, err)
 			}
 		})
+	}
+}
+
+func TestDecodeEPCRejectsOverlongGIAI202(t *testing.T) {
+	// Partition 0 leaves 148 bits (21 characters) for the reference, but the
+	// GIAI is limited to 30 characters including the 12-digit prefix.
+	coding, _ := epcCodingByName("giai-202")
+	hexTag := encodeTestEPC(t, coding, 3, 0, "061414112345", "ABCDEFGHIJKLMNOPQRS", "")
+	if _, err := DecodeEPC(hexTag); !errors.Is(err, ErrInvalidData) {
+		t.Errorf("DecodeEPC(%s) error = %v, want ErrInvalidData", hexTag, err)
+	}
+	hexTag = encodeTestEPC(t, coding, 3, 0, "061414112345", "ABCDEFGHIJKLMNOPQR", "")
+	if got, err := DecodeEPC(hexTag); err != nil || got.Reference != "ABCDEFGHIJKLMNOPQR" {
+		t.Errorf("DecodeEPC(%s) = %+v, %v, want an 18-character reference", hexTag, got, err)
 	}
 }
 
