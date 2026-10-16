@@ -33,6 +33,8 @@ b.GSIN() // "12345678901234567"
 
 ## Features
 
+- **Every Application Identifier** of the GS1 Barcode Syntax Dictionary,
+  generated from the vendored release by `go generate`.
 - **Element string parsing** for fixed- and variable-length AIs with FNC1
   (ASCII 29) separators, bracket notation `(01)…(17)…`, AIM symbology
   identifiers (`]C1`, `]d2`, `]Q3`, `]e0`, `]J1`, `]E`, `]I`) and bare EAN-13 / UPC-A / GTIN-14.
@@ -208,10 +210,14 @@ UPC-E expansion has already replaced the original digit, so post-parse
 validation cannot recover a mismatched digit from that scan. Enable
 `ValidateCheckDigits` while parsing to check it.
 
-The strict association rules currently cover: AI 01 excluding 02 and 37; AI
-02 requiring 37; AI 37 requiring AI 00 with 02 or 8026; AI 21 requiring 01,
-03, or 8006; net weight requiring 01 or 02; gross weight requiring 00 or 01;
-one decimal variant per measure prefix; and AI 8017 excluding 8018.
+The association rules are the `req=` and `ex=` attributes of the GS1
+Barcode Syntax Dictionary, evaluated for every AI present: each `req` group
+needs one of its alternatives (`01+21` means both), and an `ex` pattern must
+not match another AI, with `n` as a digit wildcard so `3102` with `3103`
+fails on `310n`. Errors read `AI (37) requires AI (02) or AI (8026)` or
+`AI (3102) excludes AI (3103)`. Some dictionary rules are stricter than the
+scanner habits this parser tolerates leniently: (12) requires (8020), and
+(10) requires an item key such as (01).
 
 ### Dates
 
@@ -252,53 +258,28 @@ Custom profiles are plain values: `gs1.Regulator{Name: "…", RequiredAIs: []str
 
 ## Supported Application Identifiers
 
-Formats use GS1 Syntax Dictionary notation: `N14` is exactly 14 digits,
-`X..20` is up to 20 characters from the GS1 AI encodable character set 82.
+The AI table is generated from the
+[GS1 Barcode Syntax Dictionary](https://github.com/gs1/gs1-syntax-dictionary)
+(release 2026-01-27, Apache License 2.0, vendored under
+`internal/gen/aitable`), so every Application Identifier in that release
+parses: 541 AIs including the measures (310n–369n), prices (39nn),
+shipping addresses (43nn), food and healthcare attributes (70nn, 71n, 72nn),
+identification keys (253, 255, 401, 402, 8003–8018) and the Digital Link
+and coupon AIs. `gs1.SyntaxDictionaryRelease()` returns the release in use.
 
-| AI | Data title | Format |
-|---|---|---|
-| 00 | SSCC | N18 |
-| 01 | GTIN | N14 |
-| 02 | Content GTIN | N14 |
-| 10 | Batch/Lot | X..20 |
-| 11 | Production Date | N6 |
-| 12 | Due Date | N6 |
-| 13 | Packaging Date | N6 |
-| 15 | Best Before Date | N6 |
-| 17 | Expiration Date | N6 |
-| 21 | Serial Number | X..20 |
-| 30 | Count | N..8 |
-| 37 | Count of Trade Items | N..8 |
-| 240 | Additional Product ID | X..30 |
-| 241 | Customer Part Number | X..30 |
-| 253 | GDTI | N13 + X..17 |
-| 401 | GINC | X..30 |
-| 310n | Net Weight, kg | N6 |
-| 320n | Net Weight, lb | N6 |
-| 330n | Gross Weight, kg | N6 |
-| 340n | Gross Weight, lb | N6 |
-| 402 | GSIN | N17 |
-| 410 | Ship to / Deliver to GLN | N13 |
-| 411 | Bill to / Invoice to GLN | N13 |
-| 412 | Purchased from GLN | N13 |
-| 413 | Ship for / Deliver for GLN | N13 |
-| 414 | GLN | N13 |
-| 415 | Invoicing party GLN | N13 |
-| 416 | Production / service location GLN | N13 |
-| 417 | Party GLN | N13 |
-| 254 | GLN extension component | X..20 |
-| 7040 | GS1 UIC with extension | N1 + X3 |
-| 8003 | GRAI | N1 + N13 + X..16 |
-| 8004 | GIAI | X..30 |
-| 8017 | GSRN – Provider | N18 |
-| 8018 | GSRN – Recipient | N18 |
-| 710–714 | NHRN (DE, FR, ES, BR, PT) | X..20 |
-| 90 | Internal | X..30 |
-| 91–99 | Internal | X..90 |
+Formats use dictionary notation: `N14` is exactly 14 digits, `X..20` is up
+to 20 characters from the GS1 AI encodable character set 82, components are
+separated by spaces and optional components are bracketed, as in `N13
+[X..17]` for a GDTI. Numeric components, character set 39 (`Y`) and
+base64url (`Z`) components are checked while parsing. Value linters such as
+`yymmdd` or `iso3166` are recorded per component and exposed through the
+existing options (`ParseDate`, `ValidateCheckDigits`).
 
 `gs1 ai <code>` on the command line, or `gs1.LookupAI` in code, returns the
-same information. Requests for additional AIs are welcome; see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+data title, the dictionary title, the format and whether the AI has a
+predefined length. To move to a newer dictionary release, replace the
+vendored file and run `make generate`; CI fails when the committed table
+differs from the dictionary.
 
 ## Input formats
 

@@ -2,7 +2,7 @@ GO      ?= go
 PKG     := ./...
 FUZZTIME ?= 30s
 
-.PHONY: all test race cover lint vet fuzz bench wasm build clean
+.PHONY: all test race cover lint vet fuzz bench wasm build clean generate check-generate
 
 all: vet lint test
 
@@ -30,6 +30,12 @@ bench:
 
 build:
 	$(GO) build -o gs1 ./cmd/gs1
+
+generate:
+	$(GO) generate ./...
+
+check-generate: generate
+	git diff --exit-code -- ai_table.go
 
 wasm:
 	bash wasm/build.sh

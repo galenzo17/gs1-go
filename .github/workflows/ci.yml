@@ -42,6 +42,17 @@ jobs:
           files: coverage.out
           fail_ci_if_error: false
 
+  generate:
+    name: Generated AI table is current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go generate ./...
+      - run: git diff --exit-code -- ai_table.go
+
   wasm:
     name: WebAssembly build
     runs-on: ubuntu-latest

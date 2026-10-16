@@ -57,10 +57,10 @@ func validateEncodeElement(element Element, index int, seen map[string]struct{})
 	if spec.FixedLen > 0 && len(element.Value) != spec.FixedLen {
 		return fmt.Errorf("%w: AI (%s) needs %d chars, got %d", ErrInvalidData, element.AI, spec.FixedLen, len(element.Value))
 	}
-	if spec.FixedLen == 0 && len(element.Value) == 0 {
+	if len(element.Value) == 0 {
 		return fmt.Errorf("%w: AI (%s) data must not be empty", ErrInvalidData, element.AI)
 	}
-	if spec.FixedLen == 0 && len(element.Value) > spec.MaxLen {
+	if len(element.Value) > spec.MaxLen {
 		return fmt.Errorf("%w: AI (%s) data length %d exceeds max %d", ErrInvalidData, element.AI, len(element.Value), spec.MaxLen)
 	}
 	if err := validateData(element.Value, spec); err != nil {
@@ -82,13 +82,11 @@ func validateEncodableValue(value, ai string) error {
 }
 
 // isPredefinedLengthAI reports whether GS1 table 7.8.5-2 permits omitting
-// FNC1 after this AI when another element follows it.
+// FNC1 after this AI when another element follows it, as flagged in the
+// Syntax Dictionary.
 func isPredefinedLengthAI(ai string) bool {
-	if len(ai) < 2 {
-		return false
-	}
-	prefix := int(ai[0]-'0')*10 + int(ai[1]-'0')
-	return prefix <= 4 || prefix == 41 || prefix >= 11 && prefix <= 20 || prefix >= 31 && prefix <= 36
+	spec, ok := aiTable[ai]
+	return ok && spec.Predefined
 }
 
 // HRI returns the human-readable interpretation of the barcode elements.

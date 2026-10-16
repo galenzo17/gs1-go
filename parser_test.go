@@ -323,7 +323,7 @@ func TestParse(t *testing.T) {
 		},
 		{
 			name:    "truncated GTIN",
-			input:   "010415000002",
+			input:   "01041500000",
 			wantErr: ErrTruncatedData,
 		},
 		{
@@ -652,12 +652,16 @@ func TestValidateAssociations(t *testing.T) {
 		events []Element
 		want   string
 	}{
-		{name: "01 excludes 02", events: []Element{{AI: "01"}, {AI: "02"}}, want: "AI (01) excludes AI (02)"},
+		{name: "02 excludes 01", events: []Element{{AI: "01"}, {AI: "02"}}, want: "AI (02) excludes AI (01)"},
 		{name: "02 requires 37", events: []Element{{AI: "02"}}, want: "AI (02) requires AI (37)"},
-		{name: "37 requires logistic pair", events: []Element{{AI: "37"}}, want: "AI (37) requires AI (00) with AI (02) or AI (8026)"},
+		{name: "37 requires SSCC", events: []Element{{AI: "37"}}, want: "AI (37) requires AI (00)"},
+		{name: "37 requires content", events: []Element{{AI: "00", Value: "012345678901234560"}, {AI: "37"}}, want: "AI (37) requires AI (02) or AI (8026)"},
+		{name: "12 requires payment slip", events: []Element{{AI: "01", Value: "04150000021126"}, {AI: "12"}}, want: "AI (12) requires AI (8020)"},
+		{name: "7004 requires GTIN with lot", events: []Element{{AI: "01", Value: "04150000021126"}, {AI: "7004"}}, want: "AI (7004) requires AI (01) with AI (10)"},
+		{name: "pattern exclusion", events: []Element{{AI: "01", Value: "04150000021126"}, {AI: "3920"}, {AI: "3931"}}, want: "AI (3920) excludes AI (3931)"},
 		{name: "21 requires identifier", events: []Element{{AI: "21"}}, want: "AI (21) requires AI (01), AI (03), or AI (8006)"},
-		{name: "weight requires GTIN", events: []Element{{AI: "3102"}}, want: "AI (310) requires AI (01) or AI (02)"},
-		{name: "one weight decimal variant", events: []Element{{AI: "01"}, {AI: "3102"}, {AI: "3103"}}, want: "AI (310) allows only one decimal variant"},
+		{name: "weight requires GTIN", events: []Element{{AI: "3102"}}, want: "AI (3102) requires AI (01) or AI (02)"},
+		{name: "one weight decimal variant", events: []Element{{AI: "01"}, {AI: "3102"}, {AI: "3103"}}, want: "AI (3102) excludes AI (3103)"},
 		{name: "8017 excludes 8018", events: []Element{{AI: "8017"}, {AI: "8018"}}, want: "AI (8017) excludes AI (8018)"},
 		{name: "01 excludes 37", events: []Element{{AI: "01"}, {AI: "37"}}, want: "AI (01) excludes AI (37)"},
 	}
@@ -900,4 +904,21 @@ func BenchmarkParseConcurrent(b *testing.B) {
 			_ = ParseInto(input, &bc)
 		}
 	})
+}
+
+func TestTwelveDigitInputIsBareGTINWhenAIDataCannotFit(t *testing.T) {
+	// "01" is an AI, but AI (01) needs 14 digits and only 10 follow, so the
+	// input can only be a UPC-A; the check digit is left to the option.
+	b, err := Parse("010415000002")
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if b.GTIN() != "00010415000002" {
+		t.Errorf("GTIN() = %q, want zero-padded UPC-A", b.GTIN())
+	}
+	// A leading AI whose data fits stays ambiguous and the check digit decides.
+	b, err = Parse("1012345678901")
+	if err != nil || len(b.Elements) != 1 || b.Elements[0].AI != "10" {
+		t.Errorf("Parse(13 digits with plausible AI 10) = %+v, %v, want AI data", b.Elements, err)
+	}
 }
