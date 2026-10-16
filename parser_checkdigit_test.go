@@ -39,9 +39,9 @@ func TestParseIndependentValidationOptions(t *testing.T) {
 		badCheckDigit  bool
 	}{
 		{name: "valid GTIN", input: "0104150000021126"},
-		{name: "valid content GTIN", input: "0001234567890123456702041500000211263720"},
+		{name: "valid content GTIN", input: "0001234567890123456002041500000211263720"},
 		{name: "checksum only", input: "0104150000021127", badCheckDigit: true},
-		{name: "content GTIN checksum only", input: "0001234567890123456702041500000211273720", badCheckDigit: true},
+		{name: "content GTIN checksum only", input: "0001234567890123456002041500000211273720", badCheckDigit: true},
 		{name: "association only", input: "0204150000021126", badAssociation: true},
 		{name: "both errors", input: "0204150000021127", badAssociation: true, badCheckDigit: true},
 	}
@@ -202,11 +202,13 @@ func TestBarcodeValidateUsesCurrentElements(t *testing.T) {
 	}{
 		{name: "valid elements override bad Raw", raw: "0104150000021127", elements: []Element{{AI: "01", Value: "04150000021126"}}},
 		{name: "bad elements override valid Raw", raw: "0104150000021126", elements: []Element{{AI: "01", Value: "04150000021127"}}, wantErr: ErrInvalidCheckDigit},
-		{name: "content GTIN", elements: []Element{{AI: "00"}, {AI: "02", Value: "04150000021127"}, {AI: "37"}}, wantErr: ErrInvalidCheckDigit},
+		{name: "content GTIN", elements: []Element{{AI: "00", Value: "012345678901234560"}, {AI: "02", Value: "04150000021127"}, {AI: "37"}}, wantErr: ErrInvalidCheckDigit},
 		{name: "association priority", elements: []Element{{AI: "02", Value: "04150000021127"}}, wantErr: ErrInvalidAssociation},
 		{name: "later duplicate GTIN", elements: []Element{{AI: "01", Value: "04150000021126"}, {AI: "01", Value: "04150000021127"}}, wantErr: ErrInvalidCheckDigit},
 		{name: "malformed element", elements: []Element{{AI: "01", Value: "123"}}, wantErr: ErrInvalidData},
-		{name: "other keys are out of scope", raw: "malformed", elements: []Element{{AI: "00", Value: "00012345678901234567"}}},
+		{name: "valid SSCC", raw: "malformed", elements: []Element{{AI: "00", Value: "012345678901234560"}}},
+		{name: "invalid SSCC", elements: []Element{{AI: "00", Value: "012345678901234567"}}, wantErr: ErrInvalidCheckDigit},
+		{name: "invalid GLN after valid SSCC", elements: []Element{{AI: "00", Value: "012345678901234560"}, {AI: "414", Value: "0614141000013"}}, wantErr: ErrInvalidCheckDigit},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

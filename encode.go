@@ -9,8 +9,9 @@ import (
 // Encode builds a scanner-equivalent GS1 element string from AI elements.
 // Fixed-length elements are emitted first; variable-length elements are
 // separated by FNC1, with a leading FNC1 marking the GS1 payload.
-// Check digits are currently validated for AIs 01 and 02; SSCC and GLN check
-// digit validation is deferred until those identifiers have dedicated support.
+// Check digits are validated for every numeric GS1 key, the same set that
+// ParseOptions.ValidateCheckDigits covers, so Parse(Encode(x)) round-trips
+// under check-digit validation.
 func Encode(elements []Element) (string, error) {
 	if len(elements) == 0 {
 		return "", ErrEmptyInput
@@ -66,10 +67,7 @@ func validateEncodeElement(element Element, index int, seen map[string]struct{})
 	if err := validateData(element.Value, spec); err != nil {
 		return err
 	}
-	if element.AI == "01" || element.AI == "02" {
-		return ValidateGTIN(element.Value)
-	}
-	return nil
+	return validateElementCheckDigit(element)
 }
 
 func validateEncodableValue(value, ai string) error {
