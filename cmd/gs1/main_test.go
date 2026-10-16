@@ -250,6 +250,30 @@ func TestParseStreamJSONReportsErrorsInline(t *testing.T) {
 	}
 }
 
+func checkEPCTagJSON(t *testing.T, out string) {
+	t.Helper()
+	var got parseOutput
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out)
+	}
+	if got.Symbology != "EPC" || got.EPC == nil || got.EPC.Scheme != "sscc" || got.EPC.Bits != 96 || got.EPC.Filter == nil || *got.EPC.Filter != 3 ||
+		got.EPC.CompanyPrefix != "0614141" || got.EPC.Reference != "1234567890" || got.EPC.URI != "urn:epc:id:sscc:0614141.1234567890" ||
+		len(got.Elements) != 1 || got.Elements[0].AI != "00" || got.Elements[0].Value != "106141412345678908" {
+		t.Errorf("JSON = %+v epc %+v", got, got.EPC)
+	}
+}
+
+func checkEPCIdentityJSON(t *testing.T, out string) {
+	t.Helper()
+	var got parseOutput
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.EPC == nil || got.EPC.Filter != nil || got.EPC.Bits != 0 || got.GLN != "0614141123452" || len(got.Elements) != 1 {
+		t.Errorf("pure identity JSON = %+v epc %+v", got, got.EPC)
+	}
+}
+
 func TestEPC(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -262,26 +286,8 @@ func TestEPC(t *testing.T) {
 	}{
 		{name: "text", args: []string{"epc", "3074257BF7194E4000001A85"},
 			wantOut: []string{"SGTIN-96 urn:epc:id:sgtin:0614141.812345.6789", "(01) 80614141123458", "GTIN", "(21) 6789", "Serial Number"}},
-		{name: "json tag URI", args: []string{"epc", "-json", "urn:epc:tag:sscc-96:3.0614141.1234567890"}, check: func(t *testing.T, out string) {
-			var got parseOutput
-			if err := json.Unmarshal([]byte(out), &got); err != nil {
-				t.Fatalf("invalid JSON: %v\n%s", err, out)
-			}
-			if got.Symbology != "EPC" || got.EPC == nil || got.EPC.Scheme != "sscc" || got.EPC.Bits != 96 || got.EPC.Filter == nil || *got.EPC.Filter != 3 ||
-				got.EPC.CompanyPrefix != "0614141" || got.EPC.Reference != "1234567890" || got.EPC.URI != "urn:epc:id:sscc:0614141.1234567890" ||
-				len(got.Elements) != 1 || got.Elements[0].AI != "00" || got.Elements[0].Value != "106141412345678908" {
-				t.Errorf("JSON = %+v epc %+v", got, got.EPC)
-			}
-		}},
-		{name: "json pure identity", args: []string{"epc", "-json", "urn:epc:id:sgln:0614141.12345.0"}, check: func(t *testing.T, out string) {
-			var got parseOutput
-			if err := json.Unmarshal([]byte(out), &got); err != nil {
-				t.Fatal(err)
-			}
-			if got.EPC == nil || got.EPC.Filter != nil || got.EPC.Bits != 0 || got.GLN != "0614141123452" || len(got.Elements) != 1 {
-				t.Errorf("pure identity JSON = %+v epc %+v", got, got.EPC)
-			}
-		}},
+		{name: "json tag URI", args: []string{"epc", "-json", "urn:epc:tag:sscc-96:3.0614141.1234567890"}, check: checkEPCTagJSON},
+		{name: "json pure identity", args: []string{"epc", "-json", "urn:epc:id:sgln:0614141.12345.0"}, check: checkEPCIdentityJSON},
 		{name: "unsupported scheme", args: []string{"epc", "350000000000000000000000"}, wantCode: 1, wantErr: "unsupported EPC scheme"},
 		{name: "regulator", args: []string{"epc", "-validate", "anvisa", "3074257BF7194E4000001A85"}, wantCode: 1, wantErr: "missing required AI"},
 		{name: "bad regulator", args: []string{"epc", "-validate", "nope", "3074257BF7194E4000001A85"}, wantCode: 2, wantErr: "unknown regulator"},

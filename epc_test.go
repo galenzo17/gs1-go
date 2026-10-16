@@ -369,6 +369,9 @@ func FuzzDecodeEPC(f *testing.F) {
 	f.Add("")
 	f.Add("urn:epc:tag:sgtin-96:3.0614141.812345.6789")
 	f.Add("urn:epc:id:giai:0614141.32a%2Fb")
+	// Found by fuzzing: a control character and an escaped dot in a serial.
+	f.Add("urn:epc:id:giai:000000.000%09")
+	f.Add("urn:epc:id:giai:000000.%2E")
 	f.Fuzz(func(t *testing.T, input string) {
 		if b, err := ParseEPC(input); err == nil {
 			if len(b.Elements) == 0 || b.Symbology != SymEPC {
