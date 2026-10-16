@@ -42,6 +42,20 @@ jobs:
           files: coverage.out
           fail_ci_if_error: false
 
+  release-config:
+    name: GoReleaser config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check
+
   wasm:
     name: WebAssembly build
     runs-on: ubuntu-latest

@@ -295,4 +295,9 @@ func TestUsageAndVersion(t *testing.T) {
 	if code, out, _ := exec(t, "", "version"); code != 0 || !strings.HasPrefix(out, "gs1 ") {
 		t.Errorf("version: exit %d out %q", code, out)
 	}
+	version, commit, date = "v9.9.9", "abc1234", "2026-01-02"
+	defer func() { version, commit, date = "", "", "" }()
+	if code, out, _ := exec(t, "", "version"); code != 0 || strings.TrimSpace(out) != "gs1 v9.9.9 (abc1234, 2026-01-02)" {
+		t.Errorf("release version: exit %d out %q", code, out)
+	}
 }

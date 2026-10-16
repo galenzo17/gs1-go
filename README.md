@@ -64,11 +64,20 @@ go get github.com/galenzo17/gs1-go@latest
 Requires Go 1.23 or later. The module has no dependencies outside the
 standard library.
 
-CLI:
+CLI, from the package manager of your platform or from source:
 
 ```bash
+brew install galenzo17/tap/gs1                       # macOS and Linux (Homebrew)
+yay -S gs1-bin                                       # Arch Linux (AUR)
+docker run --rm ghcr.io/galenzo17/gs1 parse "(01)04150000021126(10)LOT42"
 go install github.com/galenzo17/gs1-go/cmd/gs1@latest
 ```
+
+Every [GitHub release](https://github.com/galenzo17/gs1-go/releases) also
+carries bare binaries and archives for linux, macOS and Windows on amd64 and
+arm64, deb/rpm/apk packages, SHA-256 checksums and SPDX SBOMs, all produced
+by [GoReleaser](.goreleaser.yaml). `make snapshot` runs the same pipeline
+locally without a tag.
 
 ## Usage
 

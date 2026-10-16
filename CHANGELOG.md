@@ -9,6 +9,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ### Added
 
+- GoReleaser release pipeline (`.goreleaser.yaml`): the same six binaries
+  as before with their bare names plus tar.gz/zip archives, SHA-256
+  checksums, SPDX SBOMs, deb/rpm/apk packages, a Homebrew cask in
+  `galenzo17/homebrew-tap`, the `gs1-bin` AUR package, a `FROM scratch`
+  multi-arch image at `ghcr.io/galenzo17/gs1`, a changelog grouped by
+  conventional-commit type and the WebAssembly artifacts attached to the
+  release. `gs1 version` reports commit and date on release builds;
+  `make snapshot` runs the pipeline locally.
 - npm package `@galenzo17/gs1-wasm`: `wasm/package.json` with ESM exports
   and types, a loader that resolves `gs1.wasm` and `wasm_exec.js` next to
   itself (bundlers, CDNs and Node 20+ work without a path argument), a
