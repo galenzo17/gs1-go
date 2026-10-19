@@ -136,13 +136,13 @@ func TestEncodeGoldens(t *testing.T) {
 			}
 
 			// The HRI is itself valid encoder input (bracket notation).
-			reparsed, err := Parse(tt.hri)
+			reparsed, err := ParseHRI(tt.hri)
 			if err != nil {
-				t.Fatalf("Parse(HRI) error = %v", err)
+				t.Fatalf("ParseHRI(HRI) error = %v", err)
 			}
-			again, err := Encode(reparsed.Elements)
+			again, err := Encode(reparsed)
 			if err != nil || again != raw {
-				t.Errorf("Encode(Parse(HRI)) = %q, %v, want %q", again, err, raw)
+				t.Errorf("Encode(ParseHRI(HRI)) = %q, %v, want %q", again, err, raw)
 			}
 		})
 	}
