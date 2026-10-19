@@ -97,9 +97,12 @@ type ParseOptions struct {
 	AssumeBareGTIN8 bool
 	// ValidateAssociations enforces AI association rules after parsing.
 	ValidateAssociations bool
-	// ValidateCheckDigits checks GTIN check digits for AI 01 and AI 02,
-	// including bare GTINs and EAN/UPC and ITF-14 carrier payloads.
-	// It is independent of ValidateAssociations and is disabled by default.
+	// ValidateCheckDigits checks the modulo-10 check digit of every numeric
+	// GS1 key in the element string: GTIN (01, 02, including bare GTINs and
+	// EAN/UPC and ITF-14 carrier payloads), SSCC (00), GSIN (402), the GLN
+	// family (410-417), GSRN (8017, 8018) and the numeric prefix of GDTI
+	// (253) and GRAI (8003). It is independent of ValidateAssociations and
+	// is disabled by default.
 	ValidateCheckDigits bool
 }
 
@@ -354,7 +357,8 @@ func parseAIElements(data string, pos int, b *Barcode, checkDigits bool) (checkD
 }
 
 // Validate is the umbrella for all semantic Application Identifier checks,
-// including association rules and GTIN check digits for AI 01 and AI 02.
+// including association rules and the check digits of every numeric GS1 key
+// listed under ParseOptions.ValidateCheckDigits.
 // It checks the current Elements without reparsing Raw. Association errors
 // take precedence over check-digit errors.
 func (b Barcode) Validate() error {
@@ -364,15 +368,6 @@ func (b Barcode) Validate() error {
 	for _, element := range b.Elements {
 		if err := validateElementCheckDigit(element); err != nil {
 			return err
-		}
-	}
-	return nil
-}
-
-func validateElementCheckDigit(element Element) error {
-	if element.AI == "01" || element.AI == "02" {
-		if err := ValidateGTIN(element.Value); err != nil {
-			return fmt.Errorf("AI (%s): %w", element.AI, err)
 		}
 	}
 	return nil

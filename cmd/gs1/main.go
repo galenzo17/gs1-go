@@ -4,7 +4,9 @@
 // Usage:
 //
 //	gs1 parse [-json] [-iso] [-strict] [-check-digits] [-gtin8] [-validate REGULATOR] [BARCODE]
+//	gs1 encode [-hri] [-zpl] [ELEMENTS]
 //	gs1 gtin GTIN
+//	gs1 key KEY
 //	gs1 sscc -ext DIGIT -gcp PREFIX -serial REFERENCE
 //	gs1 gtin13 -gcp PREFIX -item REFERENCE
 //	gs1 gtin14 -indicator DIGIT GTIN13
@@ -12,7 +14,10 @@
 //	gs1 version
 //
 // When BARCODE is omitted, parse reads one barcode per line from stdin
-// until EOF, which suits keyboard-wedge scanners and shell pipelines.
+// until EOF, which suits keyboard-wedge scanners and shell pipelines. The
+// encode command accepts element strings in bracket notation such as
+// "(01)04150000021126(10)LOT42", validates them and prints the scanner
+// equivalent string, its human-readable interpretation or a ZPL ^FD payload.
 package main
 
 import (
@@ -45,8 +50,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "parse":
 		return runParse(args[1:], stdin, stdout, stderr)
+	case "encode":
+		return runEncode(args[1:], stdin, stdout, stderr)
 	case "gtin":
 		return runGTIN(args[1:], stdout, stderr)
+	case "key":
+		return runKey(args[1:], stdout, stderr)
 	case "sscc":
 		return runSSCC(args[1:], stdout, stderr)
 	case "gtin13":
@@ -73,7 +82,9 @@ func usage(w io.Writer) {
 
 Usage:
   gs1 parse [-json] [-iso] [-strict] [-check-digits] [-gtin8] [-validate REGULATOR] [BARCODE]
+  gs1 encode [-hri] [-zpl] [ELEMENTS]
   gs1 gtin GTIN
+  gs1 key KEY
   gs1 sscc -ext DIGIT -gcp PREFIX -serial REFERENCE
   gs1 gtin13 -gcp PREFIX -item REFERENCE
   gs1 gtin14 -indicator DIGIT GTIN13
@@ -83,7 +94,15 @@ Usage:
 Commands:
   parse    Parse a GS1-128 / DataMatrix element string. Reads stdin line by
            line when BARCODE is omitted.
+  encode   Build the element string for a barcode generator from bracket
+           notation such as "(01)04150000021126(10)LOT42": fixed-length AIs
+           first, FNC1 (ASCII GS) where required, association rules and
+           check digits enforced. -hri prints the human-readable
+           interpretation, -zpl a ^FD payload with >8 FNC1 escapes. Reads
+           stdin line by line when ELEMENTS is omitted.
   gtin     Validate the check digit of a GTIN-8/12/13/14.
+  key      Validate the check digit of any numeric GS1 key (GTIN, SSCC, GLN,
+           GSIN, GSRN) and report the key types its length admits.
   sscc     Build an 18-digit Serial Shipping Container Code.
   gtin13   Build a GTIN-13 from a company prefix and an item reference.
   gtin14   Build a case-level GTIN-14 from an indicator digit and a GTIN-13.
@@ -148,7 +167,7 @@ func runParse(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.BoolVar(&opts.json, "json", false, "emit one JSON object per barcode")
 	fs.BoolVar(&opts.iso, "iso", false, "render date AIs (11, 12, 13, 15, 17) as ISO 8601")
 	fs.BoolVar(&opts.strict, "strict", false, "validate AI association rules")
-	fs.BoolVar(&opts.checkDigits, "check-digits", false, "validate GTIN check digits (AI 01 and AI 02)")
+	fs.BoolVar(&opts.checkDigits, "check-digits", false, "validate GS1 key check digits (GTIN, SSCC, GLN, GSIN, GSRN, GDTI, GRAI)")
 	fs.BoolVar(&opts.gtin8, "gtin8", false, "treat unprefixed eight-digit numeric input as a bare GTIN-8")
 	fs.StringVar(&opts.validate, "validate", "", "check required AIs for a regulator: anvisa, anmat, snfa, cofepris")
 	if err := fs.Parse(args); err != nil {
@@ -319,6 +338,114 @@ func isDateAI(ai string) bool {
 	return false
 }
 
+type encodeOptions struct {
+	hri bool
+	zpl bool
+}
+
+func runEncode(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("gs1 encode", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var opts encodeOptions
+	fs.BoolVar(&opts.hri, "hri", false, "print the human-readable interpretation, e.g. (01)04150000021126(10)LOT42")
+	fs.BoolVar(&opts.zpl, "zpl", false, "print ZPL ^FD field data for ^BC with >8 FNC1 escapes")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if opts.hri && opts.zpl {
+		fmt.Fprintln(stderr, "gs1: -hri and -zpl are mutually exclusive")
+		return 2
+	}
+
+	switch fs.NArg() {
+	case 0:
+		return encodeStream(stdin, stdout, stderr, opts)
+	case 1:
+		if err := encodeOne(fs.Arg(0), stdout, opts); err != nil {
+			fmt.Fprintln(stderr, "gs1:", err)
+			return 1
+		}
+		return 0
+	default:
+		fmt.Fprintln(stderr, "gs1: encode accepts at most one element string; pipe multiple element strings on stdin")
+		return 2
+	}
+}
+
+// encodeStream encodes one element string per line. Failures are reported
+// and do not stop the stream; the exit code is non-zero if any line failed.
+func encodeStream(stdin io.Reader, stdout, stderr io.Writer, opts encodeOptions) int {
+	sc := bufio.NewScanner(stdin)
+	failed := false
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" {
+			continue
+		}
+		if err := encodeOne(line, stdout, opts); err != nil {
+			failed = true
+			fmt.Fprintln(stderr, "gs1:", err)
+		}
+	}
+	if err := sc.Err(); err != nil {
+		fmt.Fprintln(stderr, "gs1: reading stdin:", err)
+		return 1
+	}
+	if failed {
+		return 1
+	}
+	return 0
+}
+
+// encodeOne reads bracket notation or a raw scan string, re-encodes it
+// through the strict encoder and prints the requested representation.
+func encodeOne(input string, stdout io.Writer, opts encodeOptions) error {
+	elements, err := encodeInput(input)
+	if err != nil {
+		return err
+	}
+	switch {
+	case opts.zpl:
+		zpl, err := gs1.EncodeZPL(elements)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintln(stdout, zpl)
+		return err
+	case opts.hri:
+		raw, err := gs1.Encode(elements)
+		if err != nil {
+			return err
+		}
+		ordered, err := gs1.Parse(raw)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintln(stdout, ordered.HRI())
+		return err
+	default:
+		raw, err := gs1.Encode(elements)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintln(stdout, raw)
+		return err
+	}
+}
+
+// encodeInput accepts bracket notation, split literally by ParseHRI so that
+// the AIs are exactly what the operator typed, or a raw scan string.
+func encodeInput(input string) ([]gs1.Element, error) {
+	if strings.HasPrefix(input, "(") {
+		return gs1.ParseHRI(input)
+	}
+	parsed, err := gs1.Parse(input)
+	if err != nil {
+		return nil, err
+	}
+	return parsed.Elements, nil
+}
+
 func runGTIN(args []string, stdout, stderr io.Writer) int {
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "usage: gs1 gtin GTIN")
@@ -333,6 +460,34 @@ func runGTIN(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintln(stdout, "valid")
 	return 0
+}
+
+// runKey validates a numeric key whose family is unknown and names every
+// family its length admits, since GTIN-13 and GLN, or SSCC and GSRN, share
+// the same digits and check-digit algorithm.
+func runKey(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: gs1 key KEY")
+		return 2
+	}
+	types, err := gs1.ValidateKey(args[0])
+	if err != nil {
+		fmt.Fprintln(stderr, "gs1:", err)
+		if errors.Is(err, gs1.ErrInvalidCheckDigit) {
+			return 1
+		}
+		return 2
+	}
+	fmt.Fprintln(stdout, "valid", formatKeyTypes(types))
+	return 0
+}
+
+func formatKeyTypes(types []gs1.KeyType) string {
+	names := make([]string, len(types))
+	for i, t := range types {
+		names[i] = t.String()
+	}
+	return strings.Join(names, " or ")
 }
 
 func runSSCC(args []string, stdout, stderr io.Writer) int {
