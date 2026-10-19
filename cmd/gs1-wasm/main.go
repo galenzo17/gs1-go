@@ -207,6 +207,29 @@ func validateGTIN(_ js.Value, args []js.Value) any {
 	return gs1.ValidateGTIN(args[0].String()) == nil
 }
 
+// validateKey validates any numeric GS1 key and reports the families its
+// length admits, mirroring the gs1 key CLI command.
+func validateKey(_ js.Value, args []js.Value) any {
+	result := js.Global().Get("Object").New()
+	if len(args) < 1 {
+		result.Set("valid", false)
+		result.Set("keyTypes", js.Global().Get("Array").New())
+		result.Set("error", "validateKey requires 1 argument")
+		return result
+	}
+	types, err := gs1.ValidateKey(args[0].String())
+	names := js.Global().Get("Array").New()
+	for _, t := range types {
+		names.Call("push", t.String())
+	}
+	result.Set("valid", err == nil)
+	result.Set("keyTypes", names)
+	if err != nil {
+		result.Set("error", err.Error())
+	}
+	return result
+}
+
 func validateRegulatory(_ js.Value, args []js.Value) any {
 	if len(args) < 2 {
 		return "validateRegulatory requires 2 arguments: input, regulator"
@@ -248,6 +271,7 @@ func main() {
 	ns.Set("parse", js.FuncOf(parse))
 	ns.Set("encode", js.FuncOf(encode))
 	ns.Set("validateGTIN", js.FuncOf(validateGTIN))
+	ns.Set("validateKey", js.FuncOf(validateKey))
 	ns.Set("validateRegulatory", js.FuncOf(validateRegulatory))
 	js.Global().Set("gs1", ns)
 

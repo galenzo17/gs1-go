@@ -15,6 +15,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   literally for encoder input. CLI `gs1 encode [-hri] [-zpl]` and WASM
   `encode()` expose both, and golden tests cover the GS1 Logistics Label
   Guideline and Syntax Engine example strings.
+- Check-digit validation for SSCC, GLN, GSIN and GSRN through
+  `ValidateSSCC`, `ValidateGLN`, `ValidateGSIN`, `ValidateGSRN`, the generic
+  `ComputeCheckDigit`, and `ValidateKey` with `KeyType` detection by length.
+  `ParseOptions.ValidateCheckDigits`, `Barcode.Validate()` and `Encode` now
+  cover AIs 00, 402, 410–417, 8017, 8018 and the numeric prefix of 253 and
+  8003 in addition to 01 and 02. CLI `gs1 key KEY` and WASM `validateKey`.
 - Opt-in GTIN check-digit validation for AI 01 and AI 02 through
   `ParseOptions.ValidateCheckDigits`, CLI `-check-digits`, and WASM
   `validateCheckDigits`, independently of association validation.
@@ -24,8 +30,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   `GRAI()` accessors.
 - Missing-FNC1 recovery coverage for mixed-format identification AIs.
 - Add dependency-free element string encoding and HRI formatting.
-- Element encoding validates 01/02 GTIN check digits; SSCC and GLN check
-  digit validation remains deferred.
+- Element encoding validates 01/02 GTIN check digits.
 - Made unsupported carrier variants fail explicitly and exposed detected
   symbology names in CLI and WASM results.
 - Added AIM symbology carrier detection and support for EAN/UPC, ITF-14, and

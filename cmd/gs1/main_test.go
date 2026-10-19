@@ -149,7 +149,7 @@ func TestParseIndependentValidationFlags(t *testing.T) {
 	}{
 		{name: "valid", input: "0104150000021126"},
 		{name: "checksum only", input: "0104150000021127", badCheckDigit: true},
-		{name: "content GTIN checksum only", input: "0001234567890123456702041500000211273720", badCheckDigit: true},
+		{name: "content GTIN checksum only", input: "0001234567890123456002041500000211273720", badCheckDigit: true},
 		{name: "association only", input: "0204150000021126", badAssociation: true},
 		{name: "both errors", input: "0204150000021127", badAssociation: true, badCheckDigit: true},
 	}
@@ -312,6 +312,59 @@ func TestGTIN(t *testing.T) {
 	}
 	if code, _, _ := exec(t, "", "gtin", "12"); code != 2 {
 		t.Errorf("bad length: exit %d, want 2", code)
+	}
+}
+
+func TestKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		key      string
+		wantCode int
+		wantOut  string
+		wantErr  string
+	}{
+		{name: "SSCC", key: "106141411234567897", wantOut: "valid SSCC or GSRN\n"},
+		{name: "GLN", key: "0614141000012", wantOut: "valid GTIN or GLN\n"},
+		{name: "GSIN", key: "06141410000000012", wantOut: "valid GSIN\n"},
+		{name: "GTIN-14", key: "04150000021126", wantOut: "valid GTIN\n"},
+		{name: "bad SSCC check digit", key: "106141411234567891", wantCode: 1, wantErr: "invalid check digit"},
+		{name: "bad GSIN check digit", key: "06141410000000013", wantCode: 1, wantErr: "invalid check digit"},
+		{name: "unsupported length", key: "123456789", wantCode: 2, wantErr: "matches no GS1 key"},
+		{name: "letters", key: "10614141123456789A", wantCode: 2, wantErr: "non-digit"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, out, errOut := exec(t, "", "key", tt.key)
+			if code != tt.wantCode || out != tt.wantOut || !strings.Contains(errOut, tt.wantErr) {
+				t.Errorf("exit %d stdout %q stderr %q, want exit %d stdout %q stderr containing %q", code, out, errOut, tt.wantCode, tt.wantOut, tt.wantErr)
+			}
+		})
+	}
+	if code, _, errOut := exec(t, "", "key"); code != 2 || !strings.Contains(errOut, "usage") {
+		t.Errorf("missing argument: exit %d stderr %q, want usage error", code, errOut)
+	}
+}
+
+func TestParseCheckDigitsCoversKeys(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "SSCC", input: "00106141411234567891", want: "AI (00)"},
+		{name: "GLN", input: "4140614141000013", want: "AI (414)"},
+		{name: "GSIN", input: "40206141410000000013", want: "AI (402)"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if code, _, errOut := exec(t, "", "parse", tt.input); code != 0 || errOut != "" {
+				t.Fatalf("lenient parse: exit %d stderr %q", code, errOut)
+			}
+			code, out, errOut := exec(t, "", "parse", "-check-digits", tt.input)
+			if code != 1 || out != "" || !strings.Contains(errOut, "invalid check digit") || !strings.Contains(errOut, tt.want) {
+				t.Errorf("exit %d stdout %q stderr %q, want check-digit error for %s", code, out, errOut, tt.want)
+			}
+		})
 	}
 }
 

@@ -15,10 +15,11 @@ import (
 //
 // Encode applies the same semantic rules as strict parsing: every value is
 // checked against its AI format and the GS1 AI encodable character set 82,
-// duplicate AIs are rejected, check digits are validated for AIs 01 and 02,
-// and the AI association rules of Barcode.ValidateAssociations are enforced,
-// so an element string that Encode accepts also parses with
-// ParseOptions{ValidateAssociations: true}.
+// duplicate AIs are rejected, check digits are validated for every numeric
+// GS1 key (the same set that ParseOptions.ValidateCheckDigits covers), and
+// the AI association rules of Barcode.ValidateAssociations are enforced, so
+// an element string that Encode accepts also parses with
+// ParseOptions{ValidateAssociations: true, ValidateCheckDigits: true}.
 func Encode(elements []Element) (string, error) {
 	ordered, err := orderForEncoding(elements)
 	if err != nil {
@@ -122,10 +123,7 @@ func validateEncodeElement(element Element, index int, seen map[string]struct{})
 	if err := validateData(element.Value, spec); err != nil {
 		return err
 	}
-	if element.AI == "01" || element.AI == "02" {
-		return ValidateGTIN(element.Value)
-	}
-	return nil
+	return validateElementCheckDigit(element)
 }
 
 func validateEncodableValue(value, ai string) error {

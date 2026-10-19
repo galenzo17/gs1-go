@@ -37,22 +37,22 @@ where applicable, check digit validated.
 | 1.7 | Production date | 11 | Required | Covered | `ProductionDate()`. |
 | 1.8 | Packaging date | 13 | Required | Covered, accessor gap | Parses; typed accessor in #12. |
 | 1.9 | Best before date | 15 | Required | Covered | `BestBeforeDate()`. |
-| 1.10 | SSCC, 17 digits + check | 00 | Required | Gap | Parses and `SSCC()` exposes it. No check-digit validation (#7) and no builder for self-assigned sequential SSCCs (#17). |
+| 1.10 | SSCC, 17 digits + check | 00 | Required | Covered, check digit opt-in | `SSCC()`, `ValidateSSCC`, `ValidateCheckDigits` on parse (#7), `NewSSCC` builder (#17). |
 | 1.11 | Net weight kg, 6 digits | 310n | Required | Gap | Parses as raw string. Implied decimal point not applied (#11). |
 | 1.12 | Gross weight kg | 330n | Required | Gap | Same as 1.11. |
 | 1.13 | Net weight lb | 320n | Required | Gap | Same as 1.11. |
 | 1.14 | Gross weight lb | 340n | Required | Gap | Same as 1.11. |
 | 1.15 | Count, up to 8 digits | 37 | Required | Covered, accessor gap | Parses; `CountOfTradeItems()` in #12. |
-| 1.16 | GLN, 12 digits + check | 414 | Required | Covered, check digit gap | Whole GLN family parses: 410–417, 254 and 7040 landed in #27 (closes #10). Check digit (#7), accessor (#12). |
+| 1.16 | GLN, 12 digits + check | 414 | Required | Covered, check digit opt-in | Whole GLN family parses: 410–417, 254 and 7040 landed in #27 (closes #10). `ValidateGLN` and `ValidateCheckDigits` cover 410–417 (#7); `GLN()` accessor (#12). |
 | 1.17 | Customer part number | 241 | Required | Covered | |
 | 1.18 | Serial number | 21 | Required | Covered | `SerialNumber()`. |
-| 1.19 | GSIN, 16 digits + check | 402 | Required | Gap | Parses. Check digit (#7), accessor (#12). |
+| 1.19 | GSIN, 16 digits + check | 402 | Required | Covered, check digit opt-in | `ValidateGSIN` and `ValidateCheckDigits` (#7); `GSIN()` accessor (#12). |
 | 1.20 | Internal AIs 90–99 | 90–99 | Required | Covered | 90 is X..30, 91–99 are X..90. |
-| 1.21 | GDTI | 253 | Recommended | Gap | Not in table (#8). |
-| 1.22 | GRAI | 8003 | Recommended | Gap | Not in table (#8). |
-| 1.23 | GIAI | 8004 | Recommended | Gap | Not in table (#8). |
-| 1.24 | GSRN | 8018 | Recommended | Gap | Not in table; 8017 added alongside (#8). |
-| 1.25 | GINC | 401 | Recommended | Gap | Not in table (#8). |
+| 1.21 | GDTI | 253 | Recommended | Covered, check digit opt-in | Landed in #32 (closes #8) with `GDTI()`. `ValidateCheckDigits` checks the 13-digit key prefix (#7). |
+| 1.22 | GRAI | 8003 | Recommended | Covered, check digit opt-in | Landed in #32 with `GRAI()`. `ValidateCheckDigits` checks the 13-digit key after the leading zero (#7). |
+| 1.23 | GIAI | 8004 | Recommended | Covered | Landed in #32. No check digit by specification. |
+| 1.24 | GSRN | 8018 | Recommended | Covered, check digit opt-in | 8017 and 8018 landed in #32. `ValidateGSRN` and `ValidateCheckDigits` (#7). |
+| 1.25 | GINC | 401 | Recommended | Covered | Landed in #32. No check digit by specification. |
 
 Cross-cutting: the module knows 63 AIs. Any other AI fails with
 `ErrUnknownAI`. Generating the full table from the GS1 Syntax Dictionary
@@ -128,7 +128,7 @@ Reference implementations: GS1 XML 3.x schemas and EANCOM at
 
 | Section | Required rows | Covered | Gap | Application layer / out of scope |
 |---|---|---|---|---|
-| 1. Keys | 20 | 10 | 10 | 0 |
+| 1. Keys | 20 | 15 | 5 | 0 |
 | 2. Symbologies | 8 | 5 | 3 | 0 |
 | 3. Processing | 6 | 3 | 2 | 1 |
 | 4. Reports | 5 | 0 | 0 | 5 |
