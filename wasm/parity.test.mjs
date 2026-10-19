@@ -36,6 +36,10 @@ try {
     { ai: "3102", name: "Net Weight kg", value: "001500", measure: { raw: "001500", value: 15, scaled: 1500, decimals: 2, unit: "kg" } },
     { ai: "3405", name: "Gross Weight lb", value: "001250", measure: { raw: "001250", value: 0.0125, scaled: 1250, decimals: 5, unit: "lb" } },
   ]);
+  const dated = gs1.parse("0104150000021126" + "17250200" + "12250630", { dateFormat: "iso", dayZero: "first" }).elements;
+  assert.equal(dated[1].date, "2025-02-01");
+  assert.equal(dated[2].date, "2025-06-30");
+  assert.ok(!("date" in gs1.parse("17250630").elements[0]));
   const internal = gs1.parse("90ABC").elements[0];
   assert.equal(internal.name, "Internal");
   assert.ok(!("measure" in internal));
@@ -51,6 +55,8 @@ try {
   assert.match(gs1.newSSCC("3", "7", "000000009").error, /company prefix/);
   assert.match(gs1.newSSCC("33", "7801234", "000000009").error, /single digit/);
   assert.match(gs1.newSSCC("3").error, /requires 3 arguments/);
+  assert.match(gs1.newSSCC(3, "7801234", "000000009").error, /extensionDigit must be a string/);
+  assert.match(gs1.newGTIN14("1", gs1.newGTIN13("7801234", "5")).error, /gtin13 must be a string/);
   assert.equal(gs1.newGTIN13("7801234", "00005"), "7801234000056");
   assert.match(gs1.newGTIN13("7801234", "5").error, /12 digits/);
   assert.match(gs1.newGTIN13("7801234").error, /requires 2 arguments/);

@@ -17,6 +17,7 @@ type elementJSON struct {
 	Name    string       `json:"name,omitempty"`
 	Value   string       `json:"value"`
 	Measure *measureJSON `json:"measure,omitempty"`
+	Date    string       `json:"date,omitempty"`
 }
 
 // measureJSON mirrors the CLI JSON measure object so both entry points
@@ -91,9 +92,10 @@ func parse(_ js.Value, args []js.Value) any {
 		return errorResult(err.Error())
 	}
 
+	dateOpts := gs1.DateOptions{DayZero: dayZero}
 	result := parseResultJSON{
 		Raw:               b.Raw,
-		Elements:          make([]elementJSON, len(b.Elements)),
+		Elements:          elementsJSON(b.Elements, dateFormat == "iso", dateOpts),
 		GTIN:              b.GTIN(),
 		Lot:               b.Lot(),
 		Serial:            b.SerialNumber(),
@@ -105,18 +107,7 @@ func parse(_ js.Value, args []js.Value) any {
 		Symbology:         b.Symbology.String(),
 		Warnings:          b.Warnings(),
 	}
-	for i, e := range b.Elements {
-		result.Elements[i] = elementJSON{AI: e.AI, Value: e.Value}
-		if ai, ok := gs1.LookupAI(e.AI); ok {
-			result.Elements[i].Name = ai.Name
-		}
-		if m, ok := measureForElement(e); ok {
-			result.Elements[i].Measure = &measureJSON{Raw: m.Raw, Value: m.Value, Scaled: m.Scaled, Decimals: m.Decimals, Unit: m.Unit}
-		}
-	}
-
 	// Resolve date fields based on options.
-	dateOpts := gs1.DateOptions{DayZero: dayZero}
 	for ai, field := range dateAIs {
 		v, ok := b.Get(ai)
 		if !ok {
@@ -150,6 +141,55 @@ func parse(_ js.Value, args []js.Value) any {
 	return js.Global().Get("JSON").Call("parse", string(data))
 }
 
+// elementsJSON mirrors the CLI JSON element objects: AI name, decoded
+// measure for four-digit measure AIs and, when iso is set, the ISO 8601 date
+// of date AIs.
+func elementsJSON(elements []gs1.Element, iso bool, dateOpts gs1.DateOptions) []elementJSON {
+	out := make([]elementJSON, len(elements))
+	for i, e := range elements {
+		out[i] = elementJSON{AI: e.AI, Value: e.Value}
+		if ai, ok := gs1.LookupAI(e.AI); ok {
+			out[i].Name = ai.Name
+		}
+		if m, ok := measureForElement(e); ok {
+			out[i].Measure = &measureJSON{Raw: m.Raw, Value: m.Value, Scaled: m.Scaled, Decimals: m.Decimals, Unit: m.Unit}
+		}
+		if iso && isDateAI(e.AI) {
+			if t, err := gs1.ParseDateWithOptions(e.Value, dateOpts); err == nil {
+				out[i].Date = t.Format("2006-01-02")
+			}
+		}
+	}
+	return out
+}
+
+// isDateAI reports whether the AI carries a YYMMDD date, the same set the
+// CLI renders per element under -iso.
+func isDateAI(ai string) bool {
+	switch ai {
+	case "11", "12", "13", "15", "17":
+		return true
+	}
+	return false
+}
+
+// stringArgs returns the first len(names) arguments as strings, or an error
+// naming the first argument that is missing or not a JavaScript string, so
+// numbers and {error} objects are rejected instead of being stringified.
+func stringArgs(fn string, args []js.Value, names ...string) ([]string, error) {
+	if len(args) < len(names) {
+		return nil, fmt.Errorf("%s requires %d arguments: %s", fn, len(names), strings.Join(names, ", "))
+	}
+	out := make([]string, len(names))
+	for i, name := range names {
+		if args[i].Type() != js.TypeString {
+			return nil, fmt.Errorf("%s: %s must be a string", fn, name)
+		}
+		out[i] = args[i].String()
+	}
+	return out, nil
+}
+
 // measureForElement decodes the implied decimals of a four-digit measure AI
 // through the same accessor the Go API exposes.
 func measureForElement(e gs1.Element) (gs1.Measure, bool) {
@@ -162,14 +202,14 @@ func measureForElement(e gs1.Element) (gs1.Measure, bool) {
 // newSSCC builds an SSCC from an extension digit, a company prefix and a
 // serial reference, returning the 18-digit string or {error}.
 func newSSCC(_ js.Value, args []js.Value) any {
-	if len(args) < 3 {
-		return errorResult("newSSCC requires 3 arguments: extensionDigit, companyPrefix, serialReference")
+	in, err := stringArgs("newSSCC", args, "extensionDigit", "companyPrefix", "serialReference")
+	if err != nil {
+		return errorResult(err.Error())
 	}
-	extension := args[0].String()
-	if len(extension) != 1 {
+	if len(in[0]) != 1 {
 		return errorResult("newSSCC: extension digit must be a single digit")
 	}
-	sscc, err := gs1.NewSSCC(extension[0], args[1].String(), args[2].String())
+	sscc, err := gs1.NewSSCC(in[0][0], in[1], in[2])
 	if err != nil {
 		return errorResult(err.Error())
 	}
@@ -178,10 +218,11 @@ func newSSCC(_ js.Value, args []js.Value) any {
 
 // newGTIN13 builds a GTIN-13 from a company prefix and an item reference.
 func newGTIN13(_ js.Value, args []js.Value) any {
-	if len(args) < 2 {
-		return errorResult("newGTIN13 requires 2 arguments: companyPrefix, itemReference")
+	in, err := stringArgs("newGTIN13", args, "companyPrefix", "itemReference")
+	if err != nil {
+		return errorResult(err.Error())
 	}
-	gtin, err := gs1.NewGTIN13(args[0].String(), args[1].String())
+	gtin, err := gs1.NewGTIN13(in[0], in[1])
 	if err != nil {
 		return errorResult(err.Error())
 	}
@@ -191,14 +232,14 @@ func newGTIN13(_ js.Value, args []js.Value) any {
 // newGTIN14 builds a case-level GTIN-14 from an indicator digit and a
 // GTIN-13.
 func newGTIN14(_ js.Value, args []js.Value) any {
-	if len(args) < 2 {
-		return errorResult("newGTIN14 requires 2 arguments: indicator, gtin13")
+	in, err := stringArgs("newGTIN14", args, "indicator", "gtin13")
+	if err != nil {
+		return errorResult(err.Error())
 	}
-	indicator := args[0].String()
-	if len(indicator) != 1 {
+	if len(in[0]) != 1 {
 		return errorResult("newGTIN14: indicator must be a single digit")
 	}
-	gtin, err := gs1.NewGTIN14(indicator[0], args[1].String())
+	gtin, err := gs1.NewGTIN14(in[0][0], in[1])
 	if err != nil {
 		return errorResult(err.Error())
 	}

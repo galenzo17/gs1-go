@@ -421,6 +421,7 @@ node wasm/parity.test.mjs        # same, for measures, names, bare GTIN-8 and bu
   r.gtin;            // "04150000021126"
   r.expirationDate;  // "2025-02-01"
   r.elements[0];     // { ai: "01", name: "GTIN", value: "04150000021126" }
+  r.elements[1];     // { ai: "17", name: "Expiration Date", value: "250200", date: "2025-02-01" }
   r.warnings;         // parser advisories such as due-date-as-expiry
 
   gs1.encode([{ ai: "10", value: "LOT42" }, { ai: "01", value: "04150000021126" }]);
@@ -430,7 +431,8 @@ node wasm/parity.test.mjs        # same, for measures, names, bare GTIN-8 and bu
   gs1.parse("96385074", { assumeBareGTIN8: true }).gtin; // "00000096385074"
 
   gs1.newSSCC("3", "7801234", "000000009");      // "378012340000000095"
-  gs1.newGTIN14("1", gs1.newGTIN13("7801234", "00005")); // "17801234000053"
+  const gtin13 = gs1.newGTIN13("7801234", "00005");   // "7801234000056"
+  if (typeof gtin13 === "string") gs1.newGTIN14("1", gtin13); // "17801234000053"
 
   gs1.validateGTIN("04150000021126");            // true
   gs1.validateKey("106141411234567897");         // { valid: true, keyTypes: ["SSCC", "GSRN"] }
@@ -444,8 +446,8 @@ The WASM `strict` option validates AI associations only; `validateCheckDigits`
 independently checks the check digits of every numeric GS1 key and returns
 the usual `{ error: string }` object on failure. `assumeBareGTIN8` mirrors
 `ParseOptions.AssumeBareGTIN8` and the CLI `-gtin8` flag. Each element carries
-the AI `name` and, for measure AIs, a `measure` object with the same shape as
-the CLI JSON output. The builders `newSSCC`, `newGTIN13` and `newGTIN14` return
+the AI `name`, for measure AIs a `measure` object, and under `dateFormat: "iso"`
+a `date` field, all with the same shape as the CLI JSON output. The builders `newSSCC`, `newGTIN13` and `newGTIN14` return
 the key or an `{ error: string }` object. The optional Node test uses the matching `wasm_exec.js`
 copied by `make wasm`; Node is not required by `make all`.
 

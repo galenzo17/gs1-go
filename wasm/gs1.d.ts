@@ -6,6 +6,8 @@ export interface GS1Element {
   value: string;
   /** Decoded measurement for four-digit measure AIs (310n, 320n, 330n, 340n). */
   measure?: GS1Measure;
+  /** ISO 8601 date for AIs 11, 12, 13, 15 and 17 when `dateFormat` is "iso". */
+  date?: string;
 }
 
 /** A numeric GS1 measurement with its original representation. */
@@ -18,8 +20,8 @@ export interface GS1Measure {
   scaled: number;
   /** Number of implied decimal places, from the fourth AI digit. */
   decimals: number;
-  /** Unit of measure, "kg" or "lb". */
-  unit: string;
+  /** Unit of measure. */
+  unit: "kg" | "lb";
 }
 
 /** A non-fatal parsing advisory. */
@@ -183,7 +185,8 @@ declare global {
 
     /**
      * Build a case-level GTIN-14 from an indicator digit and a valid GTIN-13.
-     * Returns the GTIN-14, or an object with an `error` field.
+     * Returns the GTIN-14, or an object with an `error` field. Every builder
+     * argument must be a string; numbers and `{ error }` objects are rejected.
      */
     function newGTIN14(
       indicator: string,
