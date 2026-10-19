@@ -45,7 +45,7 @@ func Encode(elements []Element) (string, error) {
 // ">8", and a literal ">" in the data as "><". The result is meant for a
 // ^BC command in automatic mode, for example:
 //
-//	^BCN,100,Y,N,N,A^FD>80104150000021126>810LOT42^FS
+//	^BCN,100,Y,N,N,A^FD>8010415000002112610LOT42^FS
 //
 // GS1 character set 82 contains neither "^" nor "~", so no other ZPL control
 // characters can appear in the output.
