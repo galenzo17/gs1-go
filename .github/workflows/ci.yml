@@ -124,18 +124,7 @@ jobs:
       - name: Loader resolves the binary next to itself
         run: node wasm/package.test.mjs
       - name: Package contains exactly the published files
-        run: |
-          cd wasm
-          npm pack --dry-run --json | node -e '
-            const [pkg] = JSON.parse(require("fs").readFileSync(0, "utf8"));
-            const files = pkg.files.map((f) => f.path).sort();
-            const want = ["LICENSE", "README.md", "gs1-loader.js", "gs1.d.ts", "gs1.wasm", "package.json", "wasm_exec.js"];
-            if (JSON.stringify(files) !== JSON.stringify(want)) {
-              console.error("npm pack would ship", files, "want", want);
-              process.exit(1);
-            }
-            console.log("npm pack ships", files.join(", "));
-          '
+        run: cd wasm && npm pack --dry-run --json | node pack-check.mjs
 
 
   smoke-fuzz:

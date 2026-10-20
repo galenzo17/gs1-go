@@ -66,7 +66,7 @@ snapshot:
 npm-check: wasm
 	cp LICENSE wasm/
 	node wasm/package.test.mjs
-	cd wasm && npm pack --dry-run
+	cd wasm && npm pack --dry-run --json | node pack-check.mjs
 
 clean:
 	rm -rf dist
