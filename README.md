@@ -39,7 +39,8 @@ b.GSIN() // "12345678901234567"
   (ASCII 29) separators, bracket notation `(01)…(17)…`, AIM symbology
   identifiers (`]C1`, `]d2`, `]Q3`, `]e0`, `]J1`, `]E`, `]I`) and bare EAN-13 / UPC-A / GTIN-14.
 - **Element string encoding** with canonical fixed-AI ordering, FNC1 placement,
-  and human-readable interpretation through `Barcode.HRI()`.
+  association and check-digit enforcement, ZPL `^FD` output, and
+  human-readable interpretation through `Barcode.HRI()`.
 - **Carrier detection** through `Barcode.Symbology`, including EAN/UPC and ITF-14.
 - **Scanner resilience by default.** UTF-8 BOM, CR/LF, NUL bytes and
   duplicated FNC1 from keyboard-wedge and USB HID scanners are normalized
@@ -49,8 +50,9 @@ b.GSIN() // "12345678901234567"
   instead of failing.
 - **Zero-allocation hot path.** `ParseInto` reuses a caller-owned `Barcode`;
   values are substrings of the input. See [ADR 0004](docs/adr/0004-zero-allocation-parsing.md).
-- **GTIN check digits** (GTIN-8/12/13/14), UPC-E expansion, YYMMDD date
-  parsing with a configurable day-zero policy.
+- **Check digits** for GTIN-8/12/13/14, SSCC, GLN, GSIN and GSRN, key-type
+  detection for operator input, UPC-E expansion, YYMMDD date parsing with a
+  configurable day-zero policy.
 - **Regulatory profiles** for LATAM pharmaceutical traceability: ANVISA,
   ANMAT, SNFA, COFEPRIS.
 - **WebAssembly build** with a JavaScript loader and TypeScript declarations.
@@ -144,31 +146,43 @@ for sc.Scan() {
 
 Run `make bench` to reproduce on your hardware.
 
-### GTIN validation
+### Check-digit validation
 
-Default parsing does not enforce GTIN check digits. Validate a GTIN explicitly
-or enable check-digit validation while parsing:
+Default parsing does not enforce check digits. Validate a key explicitly or
+enable check-digit validation while parsing:
 
 ```go
 err := gs1.ValidateGTIN("04150000021126")            // nil
+err = gs1.ValidateSSCC("106141411234567897")          // nil
+err = gs1.ValidateGLN("0614141000012")                // nil
+err = gs1.ValidateGSIN("06141410000000012")           // nil
 check, _ := gs1.ComputeGTINCheckDigit("0415000002112") // '6'
+check, _ = gs1.ComputeCheckDigit("10614141123456789")  // '7', any 1–30 digit key
 upca, _ := gs1.ExpandUPCE("012345")                    // 12-digit UPC-A
+
+types, err := gs1.ValidateKey("0614141000012")         // [GTIN GLN], nil
 
 _, err = gs1.ParseWithOptions("0104150000021127",
     gs1.ParseOptions{ValidateCheckDigits: true})
 // errors.Is(err, gs1.ErrInvalidCheckDigit) == true
 ```
 
-`ValidateCheckDigits` checks AI 01 and AI 02, including bare GTINs and
-EAN/UPC and ITF-14 payloads normalized to AI 01. It is independent of
-`ValidateAssociations`:
+`ValidateKey` is for keys of unknown family, such as values typed by an
+operator: it validates the check digit and reports every family the length
+admits, because GTIN-13 and GLN share 13 digits and SSCC and GSRN share 18.
+
+`ValidateCheckDigits` checks every numeric GS1 key in the element string:
+GTIN (AI 01 and 02, including bare GTINs and EAN/UPC and ITF-14 payloads
+normalized to AI 01), SSCC (00), GSIN (402), the GLN family (410–417), GSRN
+(8017, 8018) and the 13-digit key prefix of GDTI (253) and GRAI (8003). It
+is independent of `ValidateAssociations`:
 
 | ValidateAssociations | ValidateCheckDigits | Semantic checks |
 |---|---|---|
 | false | false | None (default) |
 | true | false | AI associations |
-| false | true | GTIN check digits for AI 01 and AI 02 |
-| true | true | AI associations, then GTIN check digits |
+| false | true | Check digits of every numeric GS1 key |
+| true | true | AI associations, then check digits |
 
 Syntax, length, and data-type errors take precedence over semantic errors.
 Check-digit errors wrap `ErrInvalidCheckDigit` and identify the AI and its
@@ -196,6 +210,44 @@ caseGTIN, _ := gs1.NewGTIN14('1', gtin13)
 to recover the SSCC components. Allocation counters and persistence remain
 the application's responsibility.
 
+### Encoding for label printing
+
+`Encode` builds the element string a barcode generator needs from AI/value
+pairs: predefined-length AIs first so they need no separator, FNC1 (ASCII GS)
+before every other AI, and a leading FNC1 marking the GS1 payload. It
+enforces the same rules as strict parsing, so a string it accepts parses with
+`ValidateAssociations` and `ValidateCheckDigits`: values are checked against
+their AI format and character set 82, duplicates and wrong check digits are
+rejected, and association rules such as `(02)` requiring `(00)` and `(37)`
+apply.
+
+```go
+elements := []gs1.Element{
+    {AI: "10", Value: "ABC123"},
+    {AI: "00", Value: "790123451234500116"},
+    {AI: "02", Value: "49012345008794"},
+    {AI: "37", Value: "12"},
+}
+raw, err := gs1.Encode(elements)
+// "\x1D00790123451234500116" + "0249012345008794" + "10ABC123" + "\x1D3712"
+
+zpl, err := gs1.EncodeZPL(elements)
+// ">800790123451234500116" + "0249012345008794" + "10ABC123" + ">83712"
+// ^BCN,100,Y,N,N,A^FD<zpl>^FS
+
+b, _ := gs1.Parse(raw)
+b.HRI() // "(00)790123451234500116(02)49012345008794(10)ABC123(37)12"
+```
+
+`ParseHRI` is the inverse of `Barcode.HRI()` for encoder input typed by
+people or stored in label templates: it splits bracket notation literally,
+without the AI table or scanner heuristics of `Parse`, so a mistyped AI
+reaches `Encode` and fails as `ErrUnknownAI`.
+
+`EncodeZPL` writes every FNC1 as the Code 128 invocation code `>8` and a
+literal `>` as `><`, for the `^BC` command in automatic mode. GS1 DataMatrix
+(`^BX`) uses a different FNC1 escape and is not covered.
+
 ### Association rules
 
 `Parse` remains lenient for scanner workflows. Use `Barcode.ValidateAssociations()`
@@ -203,8 +255,8 @@ or `ParseWithOptions` with `ValidateAssociations: true` to enforce required
 pairs and exclusions such as `(02)` with `(37)`, weights with a GTIN, and
 mutually exclusive identifier variants.
 
-`Barcode.Validate()` runs association checks followed by GTIN check-digit
-checks for AI 01 and AI 02. It uses the current `Elements` without reparsing
+`Barcode.Validate()` runs association checks followed by the check-digit
+checks of every numeric GS1 key. It uses the current `Elements` without reparsing
 `Raw`; its errors provide AI context without an input position. Lenient
 UPC-E expansion has already replaced the original digit, so post-parse
 validation cannot recover a mismatched digit from that scan. Enable
@@ -303,18 +355,28 @@ element string as GS1-128.
 ```bash
 gs1 parse "0104150000021126172506302112345ABC"        # text table
 gs1 parse -json -iso "(01)04150000021126(17)250200"   # JSON, ISO dates
-gs1 parse -check-digits "0104150000021126"              # GTIN check digits
+gs1 parse -check-digits "0104150000021126"              # key check digits
 gs1 parse -strict -check-digits "0104150000021126"      # both semantic checks
+gs1 parse -gtin8 96385074                              # bare GTIN-8 instead of AI data
 gs1 parse -validate anvisa "$SCAN"                     # exit 1 if non-compliant
 cat scans.txt | gs1 parse -json                        # one JSON object per line
-gs1 gtin 04150000021126                                # check digit
+gs1 encode "(10)LOT42(01)04150000021126"               # raw string, FNC1 as ASCII GS
+gs1 encode -hri "(10)LOT42(01)04150000021126"          # (01)04150000021126(10)LOT42
+gs1 encode -zpl "(10)LOT42(01)04150000021126"          # >8010415000002112610LOT42
+gs1 gtin 04150000021126                                # GTIN check digit
+gs1 key 106141411234567897                             # valid SSCC or GSRN
+gs1 sscc -ext 3 -gcp 7801234 -serial 000000009         # 378012340000000095
+gs1 gtin13 -gcp 7801234 -item 00005                    # 7801234000056
+gs1 gtin14 -indicator 1 7801234000056                  # 17801234000053
 gs1 ai 3102                                            # AI (3102)  Net Weight kg  N6
 ```
 
 Exit codes: `0` success, `1` invalid input or failed validation, `2` usage error.
 
 `-strict` validates AI associations only. `-check-digits` independently
-enables GTIN check-digit validation for AI 01 and AI 02.
+enables check-digit validation for every numeric GS1 key (GTIN, SSCC, GLN,
+GSIN, GSRN, GDTI, GRAI). `gs1 key` validates a key of unknown family and
+names every family its length admits.
 
 ## WebAssembly
 
@@ -323,6 +385,9 @@ The same parser runs in browsers, Electron and edge runtimes.
 ```bash
 make wasm   # produces wasm/gs1.wasm and a servable example under wasm/example/
 node wasm/check-digits.test.mjs  # optional Node runtime validation of that build
+node wasm/encode.test.mjs        # same, for encode()
+node wasm/keys.test.mjs          # same, for validateKey and key check digits
+node wasm/parity.test.mjs        # same, for measures, names, bare GTIN-8 and builders
 ```
 
 ```html
@@ -336,9 +401,22 @@ node wasm/check-digits.test.mjs  # optional Node runtime validation of that buil
   });
   r.gtin;            // "04150000021126"
   r.expirationDate;  // "2025-02-01"
+  r.elements[0];     // { ai: "01", name: "GTIN", value: "04150000021126" }
+  r.elements[1];     // { ai: "17", name: "Expiration Date", value: "250200", date: "2025-02-01" }
   r.warnings;         // parser advisories such as due-date-as-expiry
 
+  gs1.encode([{ ai: "10", value: "LOT42" }, { ai: "01", value: "04150000021126" }]);
+  // { raw: "\x1D010415000002112610LOT42", hri: "(01)04150000021126(10)LOT42", zpl: ">8010415000002112610LOT42" }
+
+  gs1.parse("3102001500").elements[0].measure;   // { raw: "001500", value: 15, scaled: 1500, decimals: 2, unit: "kg" }
+  gs1.parse("96385074", { assumeBareGTIN8: true }).gtin; // "00000096385074"
+
+  gs1.newSSCC("3", "7801234", "000000009");      // "378012340000000095"
+  const gtin13 = gs1.newGTIN13("7801234", "00005");   // "7801234000056"
+  if (typeof gtin13 === "string") gs1.newGTIN14("1", gtin13); // "17801234000053"
+
   gs1.validateGTIN("04150000021126");            // true
+  gs1.validateKey("106141411234567897");         // { valid: true, keyTypes: ["SSCC", "GSRN"] }
   gs1.validateRegulatory(scan, "anvisa");       // null when compliant, else message
 </script>
 ```
@@ -346,8 +424,12 @@ node wasm/check-digits.test.mjs  # optional Node runtime validation of that buil
 TypeScript declarations live in [`wasm/gs1.d.ts`](wasm/gs1.d.ts). Design
 notes are in [ADR 0005](docs/adr/0005-webassembly-target.md).
 The WASM `strict` option validates AI associations only; `validateCheckDigits`
-independently checks GTIN check digits and returns the usual `{ error: string }`
-object on failure. The optional Node test uses the matching `wasm_exec.js`
+independently checks the check digits of every numeric GS1 key and returns
+the usual `{ error: string }` object on failure. `assumeBareGTIN8` mirrors
+`ParseOptions.AssumeBareGTIN8` and the CLI `-gtin8` flag. Each element carries
+the AI `name`, for measure AIs a `measure` object, and under `dateFormat: "iso"`
+a `date` field, all with the same shape as the CLI JSON output. The builders `newSSCC`, `newGTIN13` and `newGTIN14` return
+the key or an `{ error: string }` object. The optional Node test uses the matching `wasm_exec.js`
 copied by `make wasm`; Node is not required by `make all`.
 
 ## Scope
