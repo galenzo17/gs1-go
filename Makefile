@@ -2,7 +2,7 @@ GO      ?= go
 PKG     := ./...
 FUZZTIME ?= 30s
 
-.PHONY: all test race cover lint vet fuzz bench wasm build clean tidy-check
+.PHONY: all test race cover lint vet fuzz bench wasm build clean tidy-check generate check-generate conformance
 
 all: vet lint test
 
@@ -39,6 +39,18 @@ tidy-check:
 	@! grep -q '^require' go.mod || { echo "go.mod must not declare dependencies"; exit 1; }
 	@test ! -e go.sum || { echo "go.sum must not exist in a zero-dependency module"; exit 1; }
 	@test -z "$$(gofmt -l .)" || { echo "gofmt needed:"; gofmt -l .; exit 1; }
+
+generate:
+	$(GO) generate ./...
+
+# bash with pipefail so the target fails on go test, not on grep.
+conformance: SHELL := /bin/bash
+conformance: .SHELLFLAGS := -o pipefail -c
+conformance:
+	$(GO) test -count=1 -run '^TestConformance$$|^TestLogisticLabelFixtures$$' -v . | grep -E 'conformance|^(--- |ok|FAIL)'
+
+check-generate: generate
+	git diff --exit-code -- ai_table.go
 
 wasm:
 	bash wasm/build.sh

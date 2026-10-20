@@ -1,0 +1,5 @@
+GS1 Barcode Syntax Dictionary release 2026-01-27
+https://github.com/gs1/gs1-syntax-dictionary
+tag 2026-01-27
+files: src/lint_csum.c, src/lint_yymmdd.c, src/lint_yymmd0.c, src/lint_csetnumeric.c,
+       src/lint_cset82.c, src/lint_cset39.c, src/lint_cset64.c, src/lint_zero.c

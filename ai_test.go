@@ -7,7 +7,7 @@ func TestAITableIntegrity(t *testing.T) {
 		if key != spec.AI {
 			t.Errorf("map key %q does not match spec.AI %q", key, spec.AI)
 		}
-		if spec.Name == "" {
+		if spec.name() == "" {
 			t.Errorf("AI %q has empty Name", key)
 		}
 		if spec.FixedLen > 0 && spec.FixedLen != spec.MaxLen {
@@ -93,10 +93,10 @@ func TestLookupAI(t *testing.T) {
 		{code: "410", wantName: "Ship to / Deliver to GLN", wantFormat: "N13", wantOK: true},
 		{code: "417", wantName: "Party GLN", wantFormat: "N13", wantOK: true},
 		{code: "254", wantName: "GLN extension component", wantFormat: "X..20", wantOK: true},
-		{code: "7040", wantName: "GS1 UIC with extension", wantFormat: "N1 + X3", wantOK: true},
-		{code: "253", wantName: "GDTI", wantFormat: "N13 + X..17", wantOK: true},
+		{code: "7040", wantName: "GS1 UIC with extension", wantFormat: "N1 X1 X1 X1", wantOK: true},
+		{code: "253", wantName: "GDTI", wantFormat: "N13 [X..17]", wantOK: true},
 		{code: "401", wantName: "GINC", wantFormat: "X..30", wantOK: true},
-		{code: "8003", wantName: "GRAI", wantFormat: "N1 + N13 + X..16", wantOK: true},
+		{code: "8003", wantName: "GRAI", wantFormat: "N1 N13 [X..16]", wantOK: true},
 		{code: "8004", wantName: "GIAI", wantFormat: "X..30", wantOK: true},
 		{code: "8017", wantName: "GSRN – Provider", wantFormat: "N18", wantOK: true},
 		{code: "88", wantOK: false},

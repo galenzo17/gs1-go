@@ -1,137 +1,103 @@
 package gs1
 
-// dataType distinguishes numeric-only from alphanumeric AI data fields.
+//go:generate go run ./internal/gen/aitable
+
+// dataType is the character set of one AI data component, in GS1 Syntax
+// Dictionary notation.
 type dataType int
 
 const (
 	dataNumeric      dataType = iota // N: digits 0-9 only
-	dataAlphanumeric                 // X: any character
-	dataUIC                          // N1+X3: one digit followed by three characters
+	dataAlphanumeric                 // X: GS1 AI encodable character set 82
+	dataCSET39                       // Y: GS1 AI encodable character set 39
+	dataBase64URL                    // Z: base64url alphabet
 )
 
-// aiSpec describes the format of a single GS1 Application Identifier.
-type aiSpec struct {
-	AI               string   // AI code, e.g. "01", "10", "3100"
-	Name             string   // human-readable name
-	FixedLen         int      // data length for fixed-length AIs; 0 means variable
-	MaxLen           int      // max data length (equals FixedLen for fixed-length AIs)
-	DataType         dataType // numeric or alphanumeric
-	NumericPrefixLen int      // numeric prefix length for mixed-format fields
-	FirstChar        byte     // required first character for mixed-format fields
-	Format           string   // explicit lookup format for mixed-format fields
+// component is one typed part of an AI data field. The dictionary splits
+// fields such as "N3,iso3166 X..9" into components that are applied in
+// order, each consuming a prefix of the data.
+type component struct {
+	Type     dataType
+	Len      int      // exact length, or the maximum length when Variable
+	Variable bool     // "N..20": 1 to Len characters; only the last component varies
+	Optional bool     // "[N3]": applied only when data remains
+	Linters  []string // GS1 Syntax Tests names such as csum, yymmdd, iso3166
 }
 
-// aiTable maps AI codes to their specifications. The parser looks up 2-digit
-// keys first, then 3-digit, then 4-digit.
-var aiTable = map[string]aiSpec{
-	// SSCC
-	"00": {AI: "00", Name: "SSCC", FixedLen: 18, MaxLen: 18, DataType: dataNumeric},
+// aiSpec describes one Application Identifier as generated from the GS1
+// Barcode Syntax Dictionary. FixedLen, MinLen, MaxLen and DataType summarize
+// the components for the parser's hot path.
+type aiSpec struct {
+	AI           string      // AI code, e.g. "01", "10", "3100"
+	Title        string      // data title from the dictionary, e.g. "BATCH/LOT"
+	Predefined   bool        // predefined length (table 7.8.5-2): no FNC1 separator needed
+	DLAttribute  bool        // permitted as a GS1 Digital Link data attribute
+	Components   []component // format specification, in order
+	Req          [][]string  // mandatory associations: each group lists alternatives, "01+21" means both
+	Ex           []string    // invalid pairings, with "n" as a digit wildcard
+	DLPKey       bool        // GS1 Digital Link primary key
+	DLQualifiers string      // ordered qualifier AIs for a primary key, "|" separates alternatives
+	FixedLen     int         // total length when every component is fixed and mandatory; 0 otherwise
+	MinLen       int         // minimum data length
+	MaxLen       int         // maximum data length
+	DataType     dataType    // dataNumeric when every component is numeric; dataAlphanumeric otherwise
+}
 
-	// GTIN
-	"01": {AI: "01", Name: "GTIN", FixedLen: 14, MaxLen: 14, DataType: dataNumeric},
-	"02": {AI: "02", Name: "Content GTIN", FixedLen: 14, MaxLen: 14, DataType: dataNumeric},
+// aiNames holds data titles for the AIs this package documented before the
+// table was generated, so CLI and JSON output keep their established names.
+// Every other AI reports the dictionary title.
+var aiNames = map[string]string{
+	"00": "SSCC", "01": "GTIN", "02": "Content GTIN", "03": "Made-to-Order GTIN",
+	"10": "Batch/Lot", "11": "Production Date", "12": "Due Date", "13": "Packaging Date",
+	"15": "Best Before Date", "16": "Sell By Date", "17": "Expiration Date",
+	"20": "Variant", "21": "Serial Number", "22": "Consumer Product Variant",
+	"30": "Count", "37": "Count of Trade Items",
+	"240": "Additional Product ID", "241": "Customer Part Number", "242": "Made-to-Order Variant",
+	"243": "Packaging Component Number", "250": "Secondary Serial Number", "251": "Reference to Source",
+	"253": "GDTI", "254": "GLN extension component", "255": "GCN",
+	"400": "Order Number", "401": "GINC", "402": "GSIN", "403": "Routing Code",
+	"410": "Ship to / Deliver to GLN", "411": "Bill to / Invoice to GLN", "412": "Purchased from GLN",
+	"413": "Ship for / Deliver for GLN", "414": "GLN", "415": "Invoicing party GLN",
+	"416": "Production / service location GLN", "417": "Party GLN",
+	"7040": "GS1 UIC with extension",
+	"710":  "NHRN Germany", "711": "NHRN France", "712": "NHRN Spain", "713": "NHRN Brazil",
+	"714": "NHRN Portugal", "715": "NHRN United States", "716": "NHRN Italy", "717": "NHRN Serbia",
+	"8003": "GRAI", "8004": "GIAI", "8006": "ITIP", "8010": "CPID", "8011": "CPID Serial",
+	"8013": "GMN", "8017": "GSRN – Provider", "8018": "GSRN – Recipient", "8026": "ITIP Content",
+	"8110": "Coupon Code (North America)", "8112": "Paperless Coupon Code (North America)",
+	"8200": "Product URL",
+}
 
-	// Batch / Lot
-	"10": {AI: "10", Name: "Batch/Lot", FixedLen: 0, MaxLen: 20, DataType: dataAlphanumeric},
+func init() {
+	for prefix, name := range map[string]string{
+		"310": "Net Weight kg", "320": "Net Weight lb", "330": "Gross Weight kg", "340": "Gross Weight lb",
+	} {
+		for d := '0'; d <= '5'; d++ {
+			aiNames[prefix+string(d)] = name
+		}
+	}
+	for ai := 90; ai <= 99; ai++ {
+		aiNames[itoa(ai)] = "Internal"
+	}
+}
 
-	// Dates (YYMMDD)
-	"11": {AI: "11", Name: "Production Date", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"12": {AI: "12", Name: "Due Date", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"13": {AI: "13", Name: "Packaging Date", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"15": {AI: "15", Name: "Best Before Date", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"17": {AI: "17", Name: "Expiration Date", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-
-	// Serial number
-	"21": {AI: "21", Name: "Serial Number", FixedLen: 0, MaxLen: 20, DataType: dataAlphanumeric},
-
-	// Counts
-	"30": {AI: "30", Name: "Count", FixedLen: 0, MaxLen: 8, DataType: dataNumeric},
-	"37": {AI: "37", Name: "Count of Trade Items", FixedLen: 0, MaxLen: 8, DataType: dataNumeric},
-
-	// Additional product identification
-	"240": {AI: "240", Name: "Additional Product ID", FixedLen: 0, MaxLen: 30, DataType: dataAlphanumeric},
-	"241": {AI: "241", Name: "Customer Part Number", FixedLen: 0, MaxLen: 30, DataType: dataAlphanumeric},
-
-	// Identification keys
-	"253":  {AI: "253", Name: "GDTI", FixedLen: 0, MaxLen: 30, DataType: dataAlphanumeric, NumericPrefixLen: 13, Format: "N13 + X..17"},
-	"401":  {AI: "401", Name: "GINC", FixedLen: 0, MaxLen: 30, DataType: dataAlphanumeric},
-	"8003": {AI: "8003", Name: "GRAI", FixedLen: 0, MaxLen: 30, DataType: dataAlphanumeric, NumericPrefixLen: 14, FirstChar: '0', Format: "N1 + N13 + X..16"},
-	"8004": {AI: "8004", Name: "GIAI", FixedLen: 0, MaxLen: 30, DataType: dataAlphanumeric},
-	"8017": {AI: "8017", Name: "GSRN – Provider", FixedLen: 18, MaxLen: 18, DataType: dataNumeric},
-	"8018": {AI: "8018", Name: "GSRN – Recipient", FixedLen: 18, MaxLen: 18, DataType: dataNumeric},
-
-	// Net weight, kg (310n — 4-digit AIs where n is decimal position)
-	"3100": {AI: "3100", Name: "Net Weight kg", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3101": {AI: "3101", Name: "Net Weight kg", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3102": {AI: "3102", Name: "Net Weight kg", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3103": {AI: "3103", Name: "Net Weight kg", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3104": {AI: "3104", Name: "Net Weight kg", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3105": {AI: "3105", Name: "Net Weight kg", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-
-	// Net weight, lb (320n)
-	"3200": {AI: "3200", Name: "Net Weight lb", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3201": {AI: "3201", Name: "Net Weight lb", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3202": {AI: "3202", Name: "Net Weight lb", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3203": {AI: "3203", Name: "Net Weight lb", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3204": {AI: "3204", Name: "Net Weight lb", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3205": {AI: "3205", Name: "Net Weight lb", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-
-	// Gross weight, kg (330n)
-	"3300": {AI: "3300", Name: "Gross Weight kg", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3301": {AI: "3301", Name: "Gross Weight kg", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3302": {AI: "3302", Name: "Gross Weight kg", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3303": {AI: "3303", Name: "Gross Weight kg", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3304": {AI: "3304", Name: "Gross Weight kg", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3305": {AI: "3305", Name: "Gross Weight kg", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-
-	// Gross weight, lb (340n)
-	"3400": {AI: "3400", Name: "Gross Weight lb", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3401": {AI: "3401", Name: "Gross Weight lb", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3402": {AI: "3402", Name: "Gross Weight lb", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3403": {AI: "3403", Name: "Gross Weight lb", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3404": {AI: "3404", Name: "Gross Weight lb", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-	"3405": {AI: "3405", Name: "Gross Weight lb", FixedLen: 6, MaxLen: 6, DataType: dataNumeric},
-
-	// GLN family — Global Location Numbers
-	"410":  {AI: "410", Name: "Ship to / Deliver to GLN", FixedLen: 13, MaxLen: 13, DataType: dataNumeric},
-	"411":  {AI: "411", Name: "Bill to / Invoice to GLN", FixedLen: 13, MaxLen: 13, DataType: dataNumeric},
-	"412":  {AI: "412", Name: "Purchased from GLN", FixedLen: 13, MaxLen: 13, DataType: dataNumeric},
-	"413":  {AI: "413", Name: "Ship for / Deliver for GLN", FixedLen: 13, MaxLen: 13, DataType: dataNumeric},
-	"414":  {AI: "414", Name: "GLN", FixedLen: 13, MaxLen: 13, DataType: dataNumeric},
-	"415":  {AI: "415", Name: "Invoicing party GLN", FixedLen: 13, MaxLen: 13, DataType: dataNumeric},
-	"416":  {AI: "416", Name: "Production / service location GLN", FixedLen: 13, MaxLen: 13, DataType: dataNumeric},
-	"417":  {AI: "417", Name: "Party GLN", FixedLen: 13, MaxLen: 13, DataType: dataNumeric},
-	"254":  {AI: "254", Name: "GLN extension component", FixedLen: 0, MaxLen: 20, DataType: dataAlphanumeric},
-	"7040": {AI: "7040", Name: "GS1 UIC with extension", FixedLen: 4, MaxLen: 4, DataType: dataUIC},
-
-	// GSIN — Global Shipment Identification Number
-	"402": {AI: "402", Name: "GSIN", FixedLen: 17, MaxLen: 17, DataType: dataNumeric},
-
-	// Custom / internal use (90-99)
-	"90": {AI: "90", Name: "Internal", FixedLen: 0, MaxLen: 30, DataType: dataAlphanumeric},
-	"91": {AI: "91", Name: "Internal", FixedLen: 0, MaxLen: 90, DataType: dataAlphanumeric},
-	"92": {AI: "92", Name: "Internal", FixedLen: 0, MaxLen: 90, DataType: dataAlphanumeric},
-	"93": {AI: "93", Name: "Internal", FixedLen: 0, MaxLen: 90, DataType: dataAlphanumeric},
-	"94": {AI: "94", Name: "Internal", FixedLen: 0, MaxLen: 90, DataType: dataAlphanumeric},
-	"95": {AI: "95", Name: "Internal", FixedLen: 0, MaxLen: 90, DataType: dataAlphanumeric},
-	"96": {AI: "96", Name: "Internal", FixedLen: 0, MaxLen: 90, DataType: dataAlphanumeric},
-	"97": {AI: "97", Name: "Internal", FixedLen: 0, MaxLen: 90, DataType: dataAlphanumeric},
-	"98": {AI: "98", Name: "Internal", FixedLen: 0, MaxLen: 90, DataType: dataAlphanumeric},
-	"99": {AI: "99", Name: "Internal", FixedLen: 0, MaxLen: 90, DataType: dataAlphanumeric},
-
-	// National Healthcare Reimbursement Number (NHRN)
-	"710": {AI: "710", Name: "NHRN Germany", FixedLen: 0, MaxLen: 20, DataType: dataAlphanumeric},
-	"711": {AI: "711", Name: "NHRN France", FixedLen: 0, MaxLen: 20, DataType: dataAlphanumeric},
-	"712": {AI: "712", Name: "NHRN Spain", FixedLen: 0, MaxLen: 20, DataType: dataAlphanumeric},
-	"713": {AI: "713", Name: "NHRN Brazil", FixedLen: 0, MaxLen: 20, DataType: dataAlphanumeric},
-	"714": {AI: "714", Name: "NHRN Portugal", FixedLen: 0, MaxLen: 20, DataType: dataAlphanumeric},
+// name returns the established data title for the AI, or the dictionary
+// title when this package has none.
+func (s *aiSpec) name() string {
+	if name, ok := aiNames[s.AI]; ok {
+		return name
+	}
+	if s.Title != "" {
+		return s.Title
+	}
+	return "AI " + s.AI
 }
 
 // lookupAIAt finds the AI spec at the given position in the input string.
-// It tries 2-digit, then 3-digit, then 4-digit keys. Returns the spec
-// and the number of characters consumed for the AI code, or false if
-// no match was found.
-func lookupAIAt(input string, pos int) (aiSpec, int, bool) {
+// GS1 AIs are prefix-free, so the first match among 2-, 3- and 4-digit keys
+// is the only match. Returns the spec and the number of characters consumed
+// for the AI code, or false if no match was found.
+func lookupAIAt(input string, pos int) (*aiSpec, int, bool) {
 	remaining := len(input) - pos
 
 	if remaining >= 2 {
@@ -150,45 +116,72 @@ func lookupAIAt(input string, pos int) (aiSpec, int, bool) {
 		}
 	}
 
-	return aiSpec{}, 0, false
+	return nil, 0, false
 }
 
-// AI describes a GS1 Application Identifier as listed in the GS1 General
-// Specifications. Format uses GS1 Syntax Dictionary notation: "N14" is
-// exactly 14 digits, "X..20" is up to 20 characters of any type.
+// AI describes a GS1 Application Identifier as listed in the GS1 Barcode
+// Syntax Dictionary. Format uses the dictionary notation: "N14" is exactly
+// 14 digits, "X..20" is up to 20 characters from character set 82, components
+// are separated by spaces and optional components are bracketed, as in
+// "N13 [X..17]".
 type AI struct {
-	Code   string // AI code, e.g. "01", "10", "3102"
-	Name   string // data title, e.g. "GTIN", "Batch/Lot"
-	Format string // format specifier, e.g. "N14", "X..20"
+	Code       string // AI code, e.g. "01", "10", "3102"
+	Name       string // data title, e.g. "GTIN", "Batch/Lot"
+	Title      string // data title as printed in the dictionary, e.g. "BATCH/LOT"
+	Format     string // format specifier, e.g. "N14", "X..20", "N3 X..9"
+	Predefined bool   // predefined length: no FNC1 separator is needed after the data
 }
 
 // LookupAI returns the specification for an Application Identifier code
-// such as "01" or "3102". The boolean is false for codes this package does
-// not recognize.
+// such as "01" or "3102". The boolean is false for codes the dictionary
+// does not define.
 func LookupAI(code string) (AI, bool) {
 	spec, ok := aiTable[code]
 	if !ok {
 		return AI{}, false
 	}
-	return AI{Code: spec.AI, Name: spec.Name, Format: spec.format()}, true
+	return AI{Code: spec.AI, Name: spec.name(), Title: spec.Title, Format: spec.format(), Predefined: spec.Predefined}, true
 }
 
-// format renders the spec in GS1 Syntax Dictionary notation.
-func (s aiSpec) format() string {
-	if s.DataType == dataUIC {
-		return "N1 + X3"
+// SyntaxDictionaryRelease returns the release date of the GS1 Barcode Syntax
+// Dictionary that the AI table was generated from, e.g. "2026-01-27".
+func SyntaxDictionaryRelease() string {
+	return syntaxDictionaryRelease
+}
+
+// format renders the components in GS1 Syntax Dictionary notation without
+// linter names.
+func (s *aiSpec) format() string {
+	out := make([]byte, 0, 8*len(s.Components))
+	for i, c := range s.Components {
+		if i > 0 {
+			out = append(out, ' ')
+		}
+		if c.Optional {
+			out = append(out, '[')
+		}
+		out = append(out, c.Type.letter())
+		if c.Variable {
+			out = append(out, '.', '.')
+		}
+		out = append(out, itoa(c.Len)...)
+		if c.Optional {
+			out = append(out, ']')
+		}
 	}
-	if s.Format != "" {
-		return s.Format
+	return string(out)
+}
+
+func (t dataType) letter() byte {
+	switch t {
+	case dataNumeric:
+		return 'N'
+	case dataCSET39:
+		return 'Y'
+	case dataBase64URL:
+		return 'Z'
 	}
-	prefix := "N"
-	if s.DataType == dataAlphanumeric {
-		prefix = "X"
-	}
-	if s.FixedLen > 0 {
-		return prefix + itoa(s.FixedLen)
-	}
-	return prefix + ".." + itoa(s.MaxLen)
+	return 'X'
 }
 
 // itoa converts a small non-negative int to decimal without importing strconv.
