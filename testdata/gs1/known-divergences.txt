@@ -8,13 +8,11 @@ engine/processAIdata	"991234"	# a missing leading FNC1 is tolerated for scanner 
 engine/processAIdata	"^99~ABC"	# X components accept any byte while parsing for scanner tolerance; character set 82 is enforced by Encode
 engine/processAIdata	"^99ABC~"	# X components accept any byte while parsing for scanner tolerance; character set 82 is enforced by Encode
 engine/processAIdata	"^70072112252212311"	# missing-FNC1 recovery splits over-long data at a plausible AI boundary (ADR 0006)
-engine/processAIdata	"^800302112345678901ABC"	# GRAI key check digit is validated by #43
 engine/processAIdata	"^72301212345678901234567890123456789"	# missing-FNC1 recovery splits over-long data at a plausible AI boundary (ADR 0006)
 engine/validateAIs	"(89)ABC(89)ABC(89)ABC"	# unknown AIs are rejected; the reference runs this suite with permitUnknownAIs
 engine/validateAIs	"(253)1234567890128(8030)ABC123"	# DIGSIG requires a serialised key: the reference checks the serial component, beyond the dictionary req attribute
 engine/validateAIs	"(255)1234567890128(8030)ABC123"	# DIGSIG requires a serialised key: the reference checks the serial component, beyond the dictionary req attribute
 engine/validateAIs	"(8003)01234567890128(8030)ABC123"	# DIGSIG requires a serialised key: the reference checks the serial component, beyond the dictionary req attribute
-engine/linters	"(00)123456789012345670"	# SSCC check digit is validated by #43
 engine/linters	"(8013)123456ABXX"	# linter csumalpha, gcppos1 not applied while parsing
 engine/linters	"(8013)A"	# linter csumalpha, gcppos1 not applied while parsing
 engine/linters	"(401)123"	# linter gcppos1 not applied while parsing
