@@ -295,7 +295,7 @@ func checkDecimalFits(value string, bits int, coding, field string) error {
 		return fmt.Errorf("%w: %s %s %q must be a decimal without leading zeros", ErrInvalidData, coding, field, value)
 	}
 	v, err := strconv.ParseUint(value, 10, 64)
-	if err != nil || bits < 64 && v >= uint64(1)<<uint(bits) {
+	if err != nil || v>>bits != 0 {
 		return fmt.Errorf("%w: %s %s %q does not fit in %d bits", ErrInvalidData, coding, field, value, bits)
 	}
 	return nil
