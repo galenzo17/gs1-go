@@ -158,6 +158,8 @@ declare global {
     function encode(
       elements: GS1Element[] | string
     ): GS1EncodeResult | GS1ParseError;
+
+    /**
      * Decode an RFID tag encoded with the EPC Tag Data Standard: hexadecimal
      * EPC memory content (SGTIN-96/198, SSCC-96, SGLN-96/195, GRAI-96/170,
      * GIAI-96/202), a tag URI or a pure-identity URI. Returns the same
