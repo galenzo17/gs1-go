@@ -149,7 +149,7 @@ func TestParseIndependentValidationFlags(t *testing.T) {
 	}{
 		{name: "valid", input: "0104150000021126"},
 		{name: "checksum only", input: "0104150000021127", badCheckDigit: true},
-		{name: "content GTIN checksum only", input: "0001234567890123456702041500000211273720", badCheckDigit: true},
+		{name: "content GTIN checksum only", input: "0001234567890123456002041500000211273720", badCheckDigit: true},
 		{name: "association only", input: "0204150000021126", badAssociation: true},
 		{name: "both errors", input: "0204150000021127", badAssociation: true, badCheckDigit: true},
 	}
@@ -250,6 +250,126 @@ func TestParseStreamJSONReportsErrorsInline(t *testing.T) {
 	}
 }
 
+func checkEPCTagJSON(t *testing.T, out string) {
+	t.Helper()
+	var got parseOutput
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out)
+	}
+	if got.Symbology != "EPC" || got.EPC == nil || got.EPC.Scheme != "sscc" || got.EPC.Bits != 96 || got.EPC.Filter == nil || *got.EPC.Filter != 3 ||
+		got.EPC.CompanyPrefix != "0614141" || got.EPC.Reference != "1234567890" || got.EPC.URI != "urn:epc:id:sscc:0614141.1234567890" ||
+		len(got.Elements) != 1 || got.Elements[0].AI != "00" || got.Elements[0].Value != "106141412345678908" {
+		t.Errorf("JSON = %+v epc %+v", got, got.EPC)
+	}
+}
+
+func checkEPCIdentityJSON(t *testing.T, out string) {
+	t.Helper()
+	var got parseOutput
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.EPC == nil || got.EPC.Filter != nil || got.EPC.Bits != 0 || got.GLN != "0614141123452" || len(got.Elements) != 1 {
+		t.Errorf("pure identity JSON = %+v epc %+v", got, got.EPC)
+	}
+}
+
+func TestEPC(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		stdin    string
+		wantCode int
+		wantOut  []string
+		wantErr  string
+		check    func(t *testing.T, out string)
+	}{
+		{name: "text", args: []string{"epc", "3074257BF7194E4000001A85"},
+			wantOut: []string{"SGTIN-96 urn:epc:id:sgtin:0614141.812345.6789", "(01) 80614141123458", "GTIN", "(21) 6789", "Serial Number"}},
+		{name: "json tag URI", args: []string{"epc", "-json", "urn:epc:tag:sscc-96:3.0614141.1234567890"}, check: checkEPCTagJSON},
+		{name: "json pure identity", args: []string{"epc", "-json", "urn:epc:id:sgln:0614141.12345.0"}, check: checkEPCIdentityJSON},
+		{name: "unsupported scheme", args: []string{"epc", "350000000000000000000000"}, wantCode: 1, wantErr: "unsupported EPC scheme"},
+		{name: "regulator", args: []string{"epc", "-validate", "anvisa", "3074257BF7194E4000001A85"}, wantCode: 1, wantErr: "missing required AI"},
+		{name: "bad regulator", args: []string{"epc", "-validate", "nope", "3074257BF7194E4000001A85"}, wantCode: 2, wantErr: "unknown regulator"},
+		{name: "two arguments", args: []string{"epc", "a", "b"}, wantCode: 2, wantErr: "at most one"},
+		{name: "stream", args: []string{"epc"}, stdin: "3074257BF7194E4000001A85\n\nxyz\n3174257BF4499602D2000000\n", wantCode: 1,
+			wantOut: []string{"---\n---", "(00) 106141412345678908"}, wantErr: "odd length"},
+		{name: "stream json reports errors inline", args: []string{"epc", "-json"}, stdin: "xyz\n", wantCode: 1, wantOut: []string{`"error":"gs1: invalid data`}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, out, errOut := exec(t, tt.stdin, tt.args...)
+			if code != tt.wantCode {
+				t.Errorf("exit %d, want %d (stdout %q stderr %q)", code, tt.wantCode, out, errOut)
+			}
+			for _, want := range tt.wantOut {
+				if !strings.Contains(out, want) {
+					t.Errorf("stdout %q lacks %q", out, want)
+				}
+			}
+			if tt.wantErr != "" && !strings.Contains(errOut, tt.wantErr) {
+				t.Errorf("stderr %q lacks %q", errOut, tt.wantErr)
+			}
+			if tt.check != nil {
+				tt.check(t, out)
+			}
+		})
+	}
+}
+
+func TestEncode(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		stdin    string
+		wantCode int
+		wantOut  string
+		wantErr  string
+	}{
+		{name: "raw", args: []string{"encode", "(10)LOT42(01)04150000021126(21)SERIAL"}, wantOut: "\x1D0104150000021126" + "10LOT42\x1D21SERIAL\n"},
+		{name: "hri reorders", args: []string{"encode", "-hri", "(10)LOT42(01)04150000021126(21)SERIAL"}, wantOut: "(01)04150000021126(10)LOT42(21)SERIAL\n"},
+		{name: "zpl", args: []string{"encode", "-zpl", "(10)LOT42(01)04150000021126(21)SERIAL"}, wantOut: ">80104150000021126" + "10LOT42>821SERIAL\n"},
+		{name: "zpl escapes greater-than", args: []string{"encode", "-zpl", "(01)04150000021126(10)A>B"}, wantOut: ">80104150000021126" + "10A><B\n"},
+		{name: "raw scan input", args: []string{"encode", "-hri", "]d20104150000021126" + "10LOT42"}, wantOut: "(01)04150000021126(10)LOT42\n"},
+		{name: "logistic label", args: []string{"encode", "-hri", "(00)790123451234500116(02)49012345008794(37)12(10)ABC123"}, wantOut: "(00)790123451234500116(02)49012345008794(37)12(10)ABC123\n"},
+		{name: "association", args: []string{"encode", "(02)49012345008794(37)12"}, wantCode: 1, wantErr: "AI (37) requires AI (00)"},
+		{name: "check digit", args: []string{"encode", "(01)04150000021127"}, wantCode: 1, wantErr: "invalid check digit"},
+		{name: "unknown AI", args: []string{"encode", "(999)1"}, wantCode: 1, wantErr: "unknown application identifier"},
+		{name: "malformed HRI", args: []string{"encode", "(01"}, wantCode: 1, wantErr: "invalid data"},
+		{name: "empty value", args: []string{"encode", "(01)(10)LOT"}, wantCode: 1, wantErr: "has no value"},
+		{name: "both flags", args: []string{"encode", "-hri", "-zpl", "(01)04150000021126"}, wantCode: 2, wantErr: "mutually exclusive"},
+		{name: "too many arguments", args: []string{"encode", "(01)04150000021126", "(10)X"}, wantCode: 2, wantErr: "at most one"},
+		{name: "stdin stream", args: []string{"encode", "-hri"}, stdin: "(10)A(01)04150000021126\n\n(21)S\n(00)790123451234500116\n", wantCode: 1,
+			wantOut: "(01)04150000021126(10)A\n(00)790123451234500116\n", wantErr: "AI (21) requires"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, out, errOut := exec(t, tt.stdin, tt.args...)
+			if code != tt.wantCode || out != tt.wantOut || !strings.Contains(errOut, tt.wantErr) {
+				t.Errorf("exit %d stdout %q stderr %q, want exit %d stdout %q stderr containing %q", code, out, errOut, tt.wantCode, tt.wantOut, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestEncodeRoundTripsThroughParse(t *testing.T) {
+	code, raw, _ := exec(t, "", "encode", "(10)LOT42(01)04150000021126(17)250630")
+	if code != 0 {
+		t.Fatalf("encode exit %d", code)
+	}
+	code, out, _ := exec(t, "", "parse", "-strict", "-check-digits", "-json", strings.TrimSpace(raw))
+	if code != 0 {
+		t.Fatalf("parse exit %d", code)
+	}
+	var got parseOutput
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Elements) != 3 || got.Elements[0].AI != "01" || got.Elements[1].AI != "17" || got.Elements[2].Value != "LOT42" {
+		t.Errorf("parse(encode()) elements = %+v", got.Elements)
+	}
+}
+
 func TestGTIN(t *testing.T) {
 	if code, out, _ := exec(t, "", "gtin", "04150000021126"); code != 0 || !strings.Contains(out, "valid") {
 		t.Errorf("valid GTIN: exit %d out %q", code, out)
@@ -262,6 +382,59 @@ func TestGTIN(t *testing.T) {
 	}
 }
 
+func TestKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		key      string
+		wantCode int
+		wantOut  string
+		wantErr  string
+	}{
+		{name: "SSCC", key: "106141411234567897", wantOut: "valid SSCC or GSRN\n"},
+		{name: "GLN", key: "0614141000012", wantOut: "valid GTIN or GLN\n"},
+		{name: "GSIN", key: "06141410000000012", wantOut: "valid GSIN\n"},
+		{name: "GTIN-14", key: "04150000021126", wantOut: "valid GTIN\n"},
+		{name: "bad SSCC check digit", key: "106141411234567891", wantCode: 1, wantErr: "invalid check digit"},
+		{name: "bad GSIN check digit", key: "06141410000000013", wantCode: 1, wantErr: "invalid check digit"},
+		{name: "unsupported length", key: "123456789", wantCode: 2, wantErr: "matches no GS1 key"},
+		{name: "letters", key: "10614141123456789A", wantCode: 2, wantErr: "non-digit"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, out, errOut := exec(t, "", "key", tt.key)
+			if code != tt.wantCode || out != tt.wantOut || !strings.Contains(errOut, tt.wantErr) {
+				t.Errorf("exit %d stdout %q stderr %q, want exit %d stdout %q stderr containing %q", code, out, errOut, tt.wantCode, tt.wantOut, tt.wantErr)
+			}
+		})
+	}
+	if code, _, errOut := exec(t, "", "key"); code != 2 || !strings.Contains(errOut, "usage") {
+		t.Errorf("missing argument: exit %d stderr %q, want usage error", code, errOut)
+	}
+}
+
+func TestParseCheckDigitsCoversKeys(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "SSCC", input: "00106141411234567891", want: "AI (00)"},
+		{name: "GLN", input: "4140614141000013", want: "AI (414)"},
+		{name: "GSIN", input: "40206141410000000013", want: "AI (402)"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if code, _, errOut := exec(t, "", "parse", tt.input); code != 0 || errOut != "" {
+				t.Fatalf("lenient parse: exit %d stderr %q", code, errOut)
+			}
+			code, out, errOut := exec(t, "", "parse", "-check-digits", tt.input)
+			if code != 1 || out != "" || !strings.Contains(errOut, "invalid check digit") || !strings.Contains(errOut, tt.want) {
+				t.Errorf("exit %d stdout %q stderr %q, want check-digit error for %s", code, out, errOut, tt.want)
+			}
+		})
+	}
+}
+
 func TestSSCC(t *testing.T) {
 	code, out, _ := exec(t, "", "sscc", "-ext", "3", "-gcp", "7801234", "-serial", "000000009")
 	if code != 0 || strings.TrimSpace(out) != "378012340000000095" {
@@ -269,6 +442,54 @@ func TestSSCC(t *testing.T) {
 	}
 	if code, _, _ := exec(t, "", "sscc", "-ext", "3", "-gcp", "7", "-serial", "000000009"); code != 1 {
 		t.Errorf("invalid SSCC: exit %d, want 1", code)
+	}
+}
+
+func TestGTINBuilders(t *testing.T) {
+	code, out, _ := exec(t, "", "gtin13", "-gcp", "7801234", "-item", "00005")
+	if code != 0 || strings.TrimSpace(out) != "7801234000056" {
+		t.Errorf("gtin13: exit %d out %q", code, out)
+	}
+	if code, _, errOut := exec(t, "", "gtin13", "-gcp", "7801234", "-item", "5"); code != 1 || !strings.Contains(errOut, "12 digits") {
+		t.Errorf("gtin13 short: exit %d stderr %q, want 1", code, errOut)
+	}
+	if code, _, errOut := exec(t, "", "gtin13", "-gcp", "7801234"); code != 2 || !strings.Contains(errOut, "usage") {
+		t.Errorf("gtin13 missing item: exit %d stderr %q, want 2", code, errOut)
+	}
+
+	code, out, _ = exec(t, "", "gtin14", "-indicator", "1", "7801234000056")
+	if code != 0 || strings.TrimSpace(out) != "17801234000053" {
+		t.Errorf("gtin14: exit %d out %q", code, out)
+	}
+	if code, _, errOut := exec(t, "", "gtin14", "-indicator", "1", "7801234000057"); code != 1 || !strings.Contains(errOut, "invalid check digit") {
+		t.Errorf("gtin14 bad GTIN-13: exit %d stderr %q, want 1", code, errOut)
+	}
+	if code, _, errOut := exec(t, "", "gtin14", "7801234000056"); code != 2 || !strings.Contains(errOut, "usage") {
+		t.Errorf("gtin14 missing indicator: exit %d stderr %q, want 2", code, errOut)
+	}
+	if code, _, _ := exec(t, "", "gtin14", "-indicator", "12", "7801234000056"); code != 2 {
+		t.Errorf("gtin14 two-digit indicator: exit %d, want 2", code)
+	}
+}
+
+func TestParseBareGTIN8Flag(t *testing.T) {
+	code, out, _ := exec(t, "", "parse", "96385074")
+	if code != 0 || !strings.Contains(out, "(96)") {
+		t.Fatalf("default: exit %d out %q, want AI interpretation", code, out)
+	}
+	code, out, _ = exec(t, "", "parse", "-gtin8", "-json", "96385074")
+	if code != 0 {
+		t.Fatalf("-gtin8: exit %d", code)
+	}
+	var got parseOutput
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Elements) != 1 || got.Elements[0].AI != "01" || got.Elements[0].Value != "00000096385074" {
+		t.Errorf("-gtin8 elements = %+v, want GTIN-8 normalized to AI 01", got.Elements)
+	}
+	if code, _, errOut := exec(t, "", "parse", "-gtin8", "-check-digits", "96385075"); code != 1 || !strings.Contains(errOut, "invalid check digit") {
+		t.Errorf("-gtin8 -check-digits: exit %d stderr %q", code, errOut)
 	}
 }
 
