@@ -7,6 +7,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Changed
+
+- Strict association validation applies the complete dictionary rules, so
+  inputs such as (12) without (8020) or (10) without an item key now fail
+  under `ValidateAssociations`. Lenient parsing is unchanged.
+- Twelve-digit input whose leading AI cannot fit its fixed data, such as
+  `010415000002`, parses as a bare UPC-A instead of a truncated AI (01).
+- Association error messages name the AI and alternatives from the
+  dictionary, e.g. `AI (3102) excludes AI (3103)`.
+
 ### Added
 
 - EPC Tag Data Standard decoding: `ParseEPC` and `DecodeEPC` read the
@@ -16,6 +26,40 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   ((01)+(21), (00), (414)+(254), (8003), (8004)) with `Symbology` `SymEPC`.
   CLI `gs1 epc` and WASM `parseEPC()` expose it with an `epc` object in the
   JSON result.
+- Conformance suite against the GS1 Barcode Syntax Engine 1.4.1 and Syntax
+  Dictionary 2026-01-27 test vectors, vendored under `testdata/gs1` with
+  their licences: 1281 vectors run through the parser, 92% agree, and the
+  100 documented divergences in `known-divergences.txt` must change
+  deliberately. `make conformance` and a CI job report the rate.
+  `ValidateAssociations` rejects an AI repeated with different values, the
+  encoder enforces character set 82 exactly, and base64url components
+  accept standard padding. `testdata/labels` holds logistic label element
+  strings per carrier.
+- The AI table is generated from the GS1 Barcode Syntax Dictionary
+  (release 2026-01-27, Apache 2.0) by `go generate`, growing from 63 to 541
+  Application Identifiers with typed components, predefined-length flags,
+  Digital Link attributes and the dictionary's `req`/`ex` association rules.
+  `ValidateAssociations` evaluates those rules for every AI; `LookupAI`
+  reports `Title` and `Predefined` and renders `Format` in dictionary
+  notation; `SyntaxDictionaryRelease()` exposes the release. CI fails when
+  the committed table differs from the dictionary.
+- CLI and WASM parity: WASM elements carry `name`, `measure` and the ISO
+  `date` like the CLI JSON output, `assumeBareGTIN8` in WASM and `-gtin8` in the CLI expose
+  `ParseOptions.AssumeBareGTIN8`, and the identifier builders reach both
+  entry points as `gs1 gtin13`, `gs1 gtin14`, `newSSCC`, `newGTIN13` and
+  `newGTIN14`.
+- `Encode` enforces AI association rules, so an element string it accepts
+  also parses with `ValidateAssociations`. `EncodeZPL` emits ZPL `^FD` field
+  data with `>8` FNC1 escapes and `ParseHRI` splits bracket notation
+  literally for encoder input. CLI `gs1 encode [-hri] [-zpl]` and WASM
+  `encode()` expose both, and golden tests cover the GS1 Logistics Label
+  Guideline and Syntax Engine example strings.
+- Check-digit validation for SSCC, GLN, GSIN and GSRN through
+  `ValidateSSCC`, `ValidateGLN`, `ValidateGSIN`, `ValidateGSRN`, the generic
+  `ComputeCheckDigit`, and `ValidateKey` with `KeyType` detection by length.
+  `ParseOptions.ValidateCheckDigits`, `Barcode.Validate()` and `Encode` now
+  cover AIs 00, 402, 410–417, 8017, 8018 and the numeric prefix of 253 and
+  8003 in addition to 01 and 02. CLI `gs1 key KEY` and WASM `validateKey`.
 - Opt-in GTIN check-digit validation for AI 01 and AI 02 through
   `ParseOptions.ValidateCheckDigits`, CLI `-check-digits`, and WASM
   `validateCheckDigits`, independently of association validation.
@@ -25,8 +69,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   `GRAI()` accessors.
 - Missing-FNC1 recovery coverage for mixed-format identification AIs.
 - Add dependency-free element string encoding and HRI formatting.
-- Element encoding validates 01/02 GTIN check digits; SSCC and GLN check
-  digit validation remains deferred.
+- Element encoding validates 01/02 GTIN check digits.
 - Made unsupported carrier variants fail explicitly and exposed detected
   symbology names in CLI and WASM results.
 - Added AIM symbology carrier detection and support for EAN/UPC, ITF-14, and

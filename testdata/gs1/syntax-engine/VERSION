@@ -1,0 +1,4 @@
+GS1 Barcode Syntax Engine 1.4.1
+https://github.com/gs1/gs1-syntax-engine
+commit 58c1dc85d9ff4eb9368293bcf5264a9fe70bfc72 (main, 2026-05-28)
+files: src/c-lib/ai.c, src/c-lib/scandata.c

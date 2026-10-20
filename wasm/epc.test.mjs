@@ -32,20 +32,20 @@ try {
   assert.equal(sgtin.symbology, "EPC");
   assert.equal(sgtin.gtin, "80614141123458");
   assert.equal(sgtin.serial, "6789");
-  assert.deepEqual(sgtin.elements, [{ ai: "01", value: "80614141123458" }, { ai: "21", value: "6789" }]);
+  assert.deepEqual(sgtin.elements, [{ ai: "01", name: "GTIN", value: "80614141123458" }, { ai: "21", name: "Serial Number", value: "6789" }]);
   assert.deepEqual(sgtin.epc, {
     scheme: "sgtin", bits: 96, filter: 3, companyPrefix: "0614141", reference: "812345", serial: "6789",
     uri: "urn:epc:id:sgtin:0614141.812345.6789",
   });
 
   const sscc = gs1.parseEPC("urn:epc:tag:sscc-96:3.0614141.1234567890");
-  assert.deepEqual(sscc.elements, [{ ai: "00", value: "106141412345678908" }]);
+  assert.deepEqual(sscc.elements, [{ ai: "00", name: "SSCC", value: "106141412345678908" }]);
   assert.equal(sscc.epc.bits, 96);
   assert.equal(sscc.epc.filter, 3);
 
   const sgln = gs1.parseEPC("urn:epc:id:sgln:0614141.12345.400");
   assert.equal(sgln.gln, "0614141123452");
-  assert.deepEqual(sgln.elements, [{ ai: "414", value: "0614141123452" }, { ai: "254", value: "400" }]);
+  assert.deepEqual(sgln.elements, [{ ai: "414", name: "GLN", value: "0614141123452" }, { ai: "254", name: "GLN extension component", value: "400" }]);
   assert.ok(!("bits" in sgln.epc) && !("filter" in sgln.epc));
 
   assert.match(gs1.parseEPC("350000000000000000000000").error, /unsupported EPC scheme/);

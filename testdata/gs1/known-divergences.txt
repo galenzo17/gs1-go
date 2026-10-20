@@ -1,0 +1,101 @@
+# Vectors whose outcome differs from the GS1 reference, one per line:
+# <suite>	<quoted input>	# reason
+# Regenerate with: go test -run TestConformance . -args -conformance.update
+engine/parseAIdata	"(10)12345\\(11)991225"	# backslash escapes for a literal parenthesis in bracket notation are not supported; Encode excludes parentheses from values instead
+engine/parseAIdata	"(10)12345\\("	# backslash escapes for a literal parenthesis in bracket notation are not supported; Encode excludes parentheses from values instead
+engine/parseAIdata	"(10)12345^"	# the caret is the reference FNC1 placeholder; this package uses the GS character, so a caret is ordinary data
+engine/processAIdata	"991234"	# a missing leading FNC1 is tolerated for scanner output (ADR 0003)
+engine/processAIdata	"^99~ABC"	# X components accept any byte while parsing for scanner tolerance; character set 82 is enforced by Encode
+engine/processAIdata	"^99ABC~"	# X components accept any byte while parsing for scanner tolerance; character set 82 is enforced by Encode
+engine/processAIdata	"^70072112252212311"	# missing-FNC1 recovery splits over-long data at a plausible AI boundary (ADR 0006)
+engine/processAIdata	"^72301212345678901234567890123456789"	# missing-FNC1 recovery splits over-long data at a plausible AI boundary (ADR 0006)
+engine/validateAIs	"(89)ABC(89)ABC(89)ABC"	# unknown AIs are rejected; the reference runs this suite with permitUnknownAIs
+engine/validateAIs	"(253)1234567890128(8030)ABC123"	# DIGSIG requires a serialised key: the reference checks the serial component, beyond the dictionary req attribute
+engine/validateAIs	"(255)1234567890128(8030)ABC123"	# DIGSIG requires a serialised key: the reference checks the serial component, beyond the dictionary req attribute
+engine/validateAIs	"(8003)01234567890128(8030)ABC123"	# DIGSIG requires a serialised key: the reference checks the serial component, beyond the dictionary req attribute
+engine/linters	"(8013)123456ABXX"	# linter csumalpha, gcppos1 not applied while parsing
+engine/linters	"(8013)A"	# linter csumalpha, gcppos1 not applied while parsing
+engine/linters	"(401)123"	# linter gcppos1 not applied while parsing
+engine/linters	"(7023)12A4"	# linter gcppos1 not applied while parsing
+engine/linters	"(7040)1AB="	# linter importeridx not applied while parsing
+engine/linters	"(8001)12340000012311"	# linter nonzero, nonzero, nonzero, winding not applied while parsing
+engine/linters	"(8011)023456789012"	# linter nozeroprefix not applied while parsing
+engine/linters	"(4321)2"	# linter yesno not applied while parsing
+engine/linters	"(8001)12341234512321"	# linter nonzero, nonzero, nonzero, winding not applied while parsing
+engine/linters	"(426)987"	# linter iso3166 not applied while parsing
+engine/linters	"(7030)987ABC"	# linter iso3166999 not applied while parsing
+engine/linters	"(4307)AA"	# linter iso3166alpha2 not applied while parsing
+engine/linters	"(3910)9870"	# linter iso4217 not applied while parsing
+engine/linters	"(8007)FR1234"	# linter iban not applied while parsing
+engine/linters	"(8007)FR12_45678901234"	# linter iban not applied while parsing
+engine/linters	"(8007)AB12345678901234"	# linter iban not applied while parsing
+engine/linters	"(8007)FR12345678901234"	# linter iban not applied while parsing
+engine/linters	"(4326)201300"	# linter yymmdd not applied while parsing
+engine/linters	"(4326)201200"	# linter yymmdd not applied while parsing
+engine/linters	"(8008)201225230060"	# linter yymmdd, hh, mi, ss not applied while parsing
+engine/linters	"(8026)123456789012310099"	# linter gcppos2, pieceoftotal not applied while parsing
+engine/linters	"(8026)123456789012310100"	# linter gcppos2, pieceoftotal not applied while parsing
+engine/linters	"(8026)123456789012310302"	# linter gcppos2, pieceoftotal not applied while parsing
+engine/linters	"(4300)ABC%0g"	# linter pcenc not applied while parsing
+engine/linters	"(8112)201234561234560123456"	# linter couponposoffer not applied while parsing
+engine/linters	"(8112)0"	# linter couponposoffer not applied while parsing
+engine/linters	"(8112)07"	# linter couponposoffer not applied while parsing
+engine/linters	"(8112)01123456"	# linter couponposoffer not applied while parsing
+engine/linters	"(8112)00123456123456"	# linter couponposoffer not applied while parsing
+engine/linters	"(8112)001234561234560"	# linter couponposoffer not applied while parsing
+engine/linters	"(8110)71234567890123"	# linter couponcode not applied while parsing
+engine/linters	"(8110)012345"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234560"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234561"	# linter couponcode not applied while parsing
+engine/linters	"(8110)012345612345611"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456116123456"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456111"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234561111"	# linter couponcode not applied while parsing
+engine/linters	"(8110)012345612345611115"	# linter couponcode not applied while parsing
+engine/linters	"(8110)012345612345611119"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456111101231"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234561111012314"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234561111012310"	# linter couponcode not applied while parsing
+engine/linters	"(8110)012345612345611110123106123456"	# linter couponcode not applied while parsing
+engine/linters	"(8110)012345612345611110123101"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456111101231011"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234561111012310115"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234561111012310119"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234561111012310110123"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456111101231011012371234567890123"	# linter couponcode not applied while parsing
+engine/linters	"(8110)012345612345611110123101101230"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456111101232"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234561111012320"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234561111012321"	# linter couponcode not applied while parsing
+engine/linters	"(8110)012345612345611110123211"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456111101232115"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456111101232110"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456111101232110123"	# linter couponcode not applied while parsing
+engine/linters	"(8110)012345612345611110123211012371234567890123"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234561111012321101230"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456111101233"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456111101233200010"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456111101234"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456111101234200010"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234561111012335006064500607"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456111101236"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234561111012360"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234561111012361"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456111101239"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234561111012393"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234561111012390"	# linter couponcode not applied while parsing
+engine/linters	"(8110)012345612345611110123903"	# linter couponcode not applied while parsing
+engine/linters	"(8110)012345612345611110123900"	# linter couponcode not applied while parsing
+engine/linters	"(8110)0123456123456111101239000"	# linter couponcode not applied while parsing
+engine/linters	"(8110)01234561234561111012390002"	# linter couponcode not applied while parsing
+engine/linters	"(8110)012345612345611110123900000"	# linter couponcode not applied while parsing
+engine/linters	"(4309)18000000010000000000"	# linter latitude, longitude not applied while parsing
+engine/linters	"(4309)00000000003600000001"	# linter latitude, longitude not applied while parsing
+engine/linters	"(4330)000000X"	# linter hyphen not applied while parsing
+engine/linters	"(7252)5"	# linter iso5218 not applied while parsing
+engine/linters	"(7258)111"	# linter posinseqslash not applied while parsing
+engine/linters	"(7258)0/3"	# linter posinseqslash not applied while parsing
+engine/linters	"(7258)2/1"	# linter posinseqslash not applied while parsing
+engine/linters	"(01)95012345678903(11)131313"	# linter gcppos2 not applied while parsing
+engine/scanData	"]E0123456789012"	# a 12-digit UPC-A after ]E0 is accepted; the reference requires the 13-digit form
