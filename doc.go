@@ -31,15 +31,18 @@
 // The detected AIM carrier is available as Barcode.Symbology; use
 // ParseWithOptions to opt in to ambiguous bare GTIN-8 input.
 //
-// Encode builds element strings for barcode generators, and Barcode.HRI
-// formats parsed elements for human-readable labels. Encode validates check
-// digits for AIs 01 and 02; SSCC and GLN check digit validation is not yet
-// provided.
+// Encode builds element strings for barcode generators and EncodeZPL the
+// matching ^FD field data for Zebra printers; Barcode.HRI formats parsed
+// elements for human-readable labels. Both encoders enforce the AI
+// association rules and validate the check digit of every numeric GS1 key
+// they emit.
 //
 // # Validation
 //
-// Parsing checks structure only. ValidateGTIN verifies the modulo-10 check
-// digit, ParseDate validates YYMMDD dates, and Regulator profiles check that
+// Parsing checks structure only. ValidateGTIN, ValidateSSCC, ValidateGLN,
+// ValidateGSIN and ValidateKey verify modulo-10 check digits (or enable
+// ParseOptions.ValidateCheckDigits to do so while parsing), ParseDate
+// validates YYMMDD dates, and Regulator profiles check that
 // the AIs mandated by a national pharmaceutical regulator are present.
 //
 // # Trademark
