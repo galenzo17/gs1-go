@@ -65,11 +65,11 @@ Then:
 
 | Channel | Mechanism | Notes |
 |---|---|---|
-| GitHub Release | `release.yml` | CLI binaries for linux/darwin/windows × amd64/arm64, `gs1.wasm`, `wasm_exec.js`, loader, types, `checksums.txt`, generated notes. |
+| GitHub Release | GoReleaser from `release.yml` (`.goreleaser.yaml`) | CLI binaries for linux/darwin/windows × amd64/arm64 as bare files and tar.gz/zip archives, deb/rpm/apk packages, `checksums.txt`, SPDX SBOMs, `gs1.wasm`, `wasm_exec.js`, loader, types, and a changelog grouped by commit type. |
 | `proxy.golang.org` | automatic on first `go get` | `go get github.com/galenzo17/gs1-go@vX.Y.Z`. The proxy caches the tag within minutes of the first request. |
 | `pkg.go.dev` | crawler, after the proxy | Shows README, licence (MIT) and the `Example*` functions. Allow up to an hour. |
-| npm `@galenzo17/gs1-wasm` | #37 | WebAssembly package from the same artifacts. |
-| Homebrew, AUR, ghcr.io | #38 | GoReleaser migration of `release.yml`. |
+| npm `@galenzo17/gs1-wasm` | `release.yml`, after GoReleaser | WebAssembly package from the same build, versioned from the tag and published with npm provenance. Needs the `NPM_TOKEN` secret. |
+| Homebrew, AUR, ghcr.io | GoReleaser | Cask in `galenzo17/homebrew-tap`, the `gs1-bin` AUR package and the multi-arch `ghcr.io/galenzo17/gs1` image. Need the `HOMEBREW_TAP_TOKEN` and `AUR_KEY` secrets; `skip_upload: auto` keeps prereleases out of the tap and AUR. |
 
 After the release, check `https://pkg.go.dev/github.com/galenzo17/gs1-go@vX.Y.Z`
 renders the new examples and that `go install github.com/galenzo17/gs1-go/cmd/gs1@vX.Y.Z`

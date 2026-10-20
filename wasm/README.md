@@ -37,7 +37,9 @@ From a CDN without a build step:
 ```
 
 The loader finds `gs1.wasm` and `wasm_exec.js` next to itself through
-`import.meta.url`, so no path configuration is needed.
+`import.meta.url`, so no path configuration is needed. To host the binary
+elsewhere, pass its URL: `loadGS1(new URL("/static/gs1.wasm", location))`.
+
 With Vite, exclude the package from dependency pre-bundling so the two files
 resolve from the package directory instead of `node_modules/.vite/deps`:
 
@@ -45,8 +47,6 @@ resolve from the package directory instead of `node_modules/.vite/deps`:
 // vite.config.js
 export default { optimizeDeps: { exclude: ["@galenzo17/gs1-wasm"] } };
 ```
- To host the binary
-elsewhere, pass its URL: `loadGS1(new URL("/static/gs1.wasm", location))`.
 
 TypeScript declarations ship in `gs1.d.ts` and resolve automatically;
 `GS1ParseResult`, `GS1ParseOptions` and the other types are exported.
