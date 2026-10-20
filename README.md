@@ -3,6 +3,7 @@
 [![CI](https://github.com/galenzo17/gs1-go/actions/workflows/ci.yml/badge.svg)](https://github.com/galenzo17/gs1-go/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/galenzo17/gs1-go.svg)](https://pkg.go.dev/github.com/galenzo17/gs1-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/galenzo17/gs1-go)](https://goreportcard.com/report/github.com/galenzo17/gs1-go)
+[![Go version](https://img.shields.io/github/go-mod/go-version/galenzo17/gs1-go)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A dependency-free Go library for parsing and validating **GS1 Application
