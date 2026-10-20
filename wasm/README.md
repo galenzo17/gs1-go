@@ -23,7 +23,7 @@ r.gtin;            // "04150000021126"
 r.expirationDate;  // "2025-06-30"
 r.lot;             // "12345"
 gs1.validateGTIN("04150000021126");         // true
-gs1.validateRegulatory(scan, "anvisa");     // null when compliant, else a message
+gs1.validateRegulatory("0104150000021126172506301012345", "anvisa"); // null when compliant, else a message
 ```
 
 From a CDN without a build step:
@@ -37,7 +37,15 @@ From a CDN without a build step:
 ```
 
 The loader finds `gs1.wasm` and `wasm_exec.js` next to itself through
-`import.meta.url`, so no path configuration is needed. To host the binary
+`import.meta.url`, so no path configuration is needed.
+With Vite, exclude the package from dependency pre-bundling so the two files
+resolve from the package directory instead of `node_modules/.vite/deps`:
+
+```js
+// vite.config.js
+export default { optimizeDeps: { exclude: ["@galenzo17/gs1-wasm"] } };
+```
+ To host the binary
 elsewhere, pass its URL: `loadGS1(new URL("/static/gs1.wasm", location))`.
 
 TypeScript declarations ship in `gs1.d.ts` and resolve automatically;

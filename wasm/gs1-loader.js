@@ -17,7 +17,16 @@ export async function loadGS1(wasmPath) {
     // classic script, so importing it as a module only runs it for effect.
     await import(new URL("./wasm_exec.js", import.meta.url).href);
   }
-  const url = wasmPath instanceof URL ? wasmPath : new URL(String(wasmPath ?? "./gs1.wasm"), import.meta.url);
+  // The default is a literal new URL(..., import.meta.url) so bundlers such
+  // as Vite add gs1.wasm to the production asset graph.
+  let url;
+  if (wasmPath === undefined) {
+    url = new URL("./gs1.wasm", import.meta.url);
+  } else if (wasmPath instanceof URL) {
+    url = wasmPath;
+  } else {
+    url = new URL(String(wasmPath), import.meta.url);
+  }
 
   const go = new globalThis.Go();
   const instance = await instantiate(url, go.importObject);

@@ -60,7 +60,7 @@ wasm:
 npm-check: wasm
 	cp LICENSE wasm/
 	node wasm/package.test.mjs
-	cd wasm && npm pack --dry-run
+	cd wasm && npm pack --dry-run --json | node pack-check.mjs
 
 clean:
 	rm -f gs1 coverage.out wasm/gs1.wasm wasm/wasm_exec.js wasm/LICENSE wasm/example/gs1.wasm wasm/example/wasm_exec.js
