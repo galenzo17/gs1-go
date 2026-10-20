@@ -2,7 +2,7 @@ GO      ?= go
 PKG     := ./...
 FUZZTIME ?= 30s
 
-.PHONY: all test race cover lint vet fuzz bench wasm build clean npm-check
+.PHONY: all test race cover lint vet fuzz bench wasm build clean npm-check generate check-generate conformance
 
 all: vet lint test
 
@@ -30,6 +30,18 @@ bench:
 
 build:
 	$(GO) build -o gs1 ./cmd/gs1
+
+generate:
+	$(GO) generate ./...
+
+# bash with pipefail so the target fails on go test, not on grep.
+conformance: SHELL := /bin/bash
+conformance: .SHELLFLAGS := -o pipefail -c
+conformance:
+	$(GO) test -count=1 -run '^TestConformance$$|^TestLogisticLabelFixtures$$' -v . | grep -E 'conformance|^(--- |ok|FAIL)'
+
+check-generate: generate
+	git diff --exit-code -- ai_table.go
 
 wasm:
 	bash wasm/build.sh
