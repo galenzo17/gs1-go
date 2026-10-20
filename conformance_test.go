@@ -261,27 +261,31 @@ func loadConformanceVectors(t *testing.T) []conformanceVector {
 
 func loadEngineVectors(t *testing.T) []conformanceVector {
 	t.Helper()
-	var vectors []conformanceVector
 	engine := filepath.Join("testdata", "gs1", "syntax-engine")
 	ai := readTestdata(t, filepath.Join(engine, "ai.c"))
 	scan := readTestdata(t, filepath.Join(engine, "scandata.c"))
 
-	for _, c := range findCalls(ai, "test_parseAIdata", 3) {
+	parseCalls := findCalls(ai, "test_parseAIdata", 3)
+	processCalls := findCalls(ai, "test_processAIdata", 2)
+	validateCalls := findCalls(ai, "test_validateAIs", 3)
+	linterRows := findTableRows(ai, "test_ai_linters")
+	vectors := make([]conformanceVector, 0, len(parseCalls)+len(processCalls)+len(validateCalls)+len(linterRows))
+	for _, c := range parseCalls {
 		if c.literal(1) && c.literal(2) {
 			vectors = append(vectors, conformanceVector{suite: "engine/parseAIdata", line: c.line, input: c.args[1], expectOK: c.args[0] == "OK", expected: c.args[2]})
 		}
 	}
-	for _, c := range findCalls(ai, "test_processAIdata", 2) {
+	for _, c := range processCalls {
 		if c.literal(1) {
 			vectors = append(vectors, conformanceVector{suite: "engine/processAIdata", line: c.line, input: c.args[1], expectOK: c.args[0] == "OK"})
 		}
 	}
-	for _, c := range findCalls(ai, "test_validateAIs", 3) {
+	for _, c := range validateCalls {
 		if c.literal(2) {
 			vectors = append(vectors, conformanceVector{suite: "engine/validateAIs", line: c.line, input: c.args[2], expectOK: c.args[0] == "OK"})
 		}
 	}
-	for _, c := range findTableRows(ai, "test_ai_linters") {
+	for _, c := range linterRows {
 		vectors = append(vectors, conformanceVector{suite: "engine/linters", line: c.line, input: c.args[0], expectOK: c.args[1] == "GS1_LINTER_OK"})
 	}
 	return append(vectors, loadScanDataVectors(scan)...)
@@ -290,8 +294,9 @@ func loadEngineVectors(t *testing.T) []conformanceVector {
 // loadScanDataVectors extracts the scan data vectors and marks the ones
 // outside this package's scope as not applicable.
 func loadScanDataVectors(scan string) []conformanceVector {
-	var vectors []conformanceVector
-	for _, c := range findCalls(scan, "test_testProcessScanData", 4) {
+	calls := findCalls(scan, "test_testProcessScanData", 4)
+	vectors := make([]conformanceVector, 0, len(calls))
+	for _, c := range calls {
 		if !c.literal(1) || !c.literal(3) {
 			continue
 		}
