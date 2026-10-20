@@ -34,6 +34,9 @@ build:
 generate:
 	$(GO) generate ./...
 
+# bash with pipefail so the target fails on go test, not on grep.
+conformance: SHELL := /bin/bash
+conformance: .SHELLFLAGS := -o pipefail -c
 conformance:
 	$(GO) test -count=1 -run '^TestConformance$$|^TestLogisticLabelFixtures$$' -v . | grep -E 'conformance|^(--- |ok|FAIL)'
 

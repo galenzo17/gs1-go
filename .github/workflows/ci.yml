@@ -62,6 +62,8 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go test -count=1 -run '^TestConformance$|^TestLogisticLabelFixtures$' -v . | grep -E 'conformance|^(--- |ok|FAIL)'
+        # bash sets -o pipefail, so the step fails on go test, not grep
+        shell: bash
 
   wasm:
     name: WebAssembly build
