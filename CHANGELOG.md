@@ -34,6 +34,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   workflow with the version taken from the git tag, and a CI smoke test
   that loads the package through its own loader and checks the published
   file list.
+- `RELEASING.md` with the module proxy rules (immutable tags, `retract`,
+  `v0.x` versus `v1.0.0` versus `/v2`), the pre-tag checklist, what a tag
+  publishes and the criteria for `v1.0.0`. A `hygiene` CI job and
+  `make tidy-check` enforce the zero-dependency promise (`go mod tidy`
+  produces no diff, no `require` block, no `go.sum`) and gofmt. Runnable
+  examples for strict parsing, association and umbrella validation, HRI,
+  the identifier builders, UPC-E expansion, check-digit computation,
+  measures, warnings and raw dates, so pkg.go.dev shows every entry point.
 - EPC Tag Data Standard decoding: `ParseEPC` and `DecodeEPC` read the
   hexadecimal memory content of SGTIN-96/198, SSCC-96, SGLN-96/195,
   GRAI-96/170 and GIAI-96/202 tags, `ParseEPCURI` and `DecodeEPCURI` read
