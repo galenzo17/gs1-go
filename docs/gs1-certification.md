@@ -28,36 +28,39 @@ where applicable, check digit validated.
 
 | # | Item | AI | Type | Status | Notes / issue |
 |---|---|---|---|---|---|
-| 1.1 | GTIN-13 for trade items | 01, 02 | Required | Covered, check digit opt-in | Length and numeric type validated on parse. Check digit via `ValidateGTIN`; strict parse mode in #6. |
-| 1.2 | GTIN-14 at case level | 01, 02 | Required | Covered, check digit opt-in | Same as 1.1. |
-| 1.3 | GTIN-12 (UPC-A) | 01, 02 | Required | Covered, check digit opt-in | Bare 12-digit input zero-padded to GTIN-14. |
-| 1.4 | GTIN-8 (EAN-8) | 01, 02 | Required | Gap | As AI (01) data it parses. Bare 8-digit input is rejected as ambiguous; fixed by symbology identifiers in #15. |
+| 1.1 | GTIN-13 for trade items | 01, 02 | Required | Covered | Length and numeric type validated on parse. Check digit via `ValidateGTIN`, or on parse with `ParseOptions.ValidateCheckDigits` (#6). |
+| 1.2 | GTIN-14 at case level | 01, 02 | Required | Covered | Same as 1.1. |
+| 1.3 | GTIN-12 (UPC-A) | 01, 02 | Required | Covered | Bare 12-digit input zero-padded to GTIN-14. |
+| 1.4 | GTIN-8 (EAN-8) | 01, 02 | Required | Covered | As AI (01) data it parses. Under the `]E4` identifier it is an EAN-8 carrier; bare 8-digit input is ambiguous with AI data, so it needs `ParseOptions.AssumeBareGTIN8` (CLI `-gtin8`, WASM `assumeBareGTIN8`) (#15). |
 | 1.5 | Batch/lot, alphanumeric up to 20 | 10 | Required | Covered | `Lot()`. |
-| 1.6 | Expiration date YYMMDD | 17 | Required | Covered; (12) gap | `ExpirationDate()`. The auditor's note about AI (12) being accepted with a warning is #9. |
+| 1.6 | Expiration date YYMMDD | 17 | Required | Covered | `ExpirationDate()`. AI (12) parses with `DueDate()` and raises the `WarnDueDateAsExpiry` warning (#9). |
 | 1.7 | Production date | 11 | Required | Covered | `ProductionDate()`. |
-| 1.8 | Packaging date | 13 | Required | Covered, accessor gap | Parses; typed accessor in #12. |
+| 1.8 | Packaging date | 13 | Required | Covered | `PackagingDate()` (#12). |
 | 1.9 | Best before date | 15 | Required | Covered | `BestBeforeDate()`. |
-| 1.10 | SSCC, 17 digits + check | 00 | Required | Covered, check digit opt-in | `SSCC()`, `ValidateSSCC`, `ValidateCheckDigits` on parse (#7), `NewSSCC` builder (#17). |
-| 1.11 | Net weight kg, 6 digits | 310n | Required | Gap | Parses as raw string. Implied decimal point not applied (#11). |
-| 1.12 | Gross weight kg | 330n | Required | Gap | Same as 1.11. |
-| 1.13 | Net weight lb | 320n | Required | Gap | Same as 1.11. |
-| 1.14 | Gross weight lb | 340n | Required | Gap | Same as 1.11. |
-| 1.15 | Count, up to 8 digits | 37 | Required | Covered, accessor gap | Parses; `CountOfTradeItems()` in #12. |
-| 1.16 | GLN, 12 digits + check | 414 | Required | Covered, check digit opt-in | Whole GLN family parses: 410–417, 254 and 7040 landed in #27 (closes #10). `ValidateGLN` and `ValidateCheckDigits` cover 410–417 (#7); `GLN()` accessor (#12). |
+| 1.10 | SSCC, 17 digits + check | 00 | Required | Covered | `SSCC()`, `ValidateSSCC`, `ValidateCheckDigits` on parse (#7), `NewSSCC` builder (#17). |
+| 1.11 | Net weight kg, 6 digits | 310n | Required | Covered | `NetWeightKg()` returns a `Measure` with the implied decimal point applied (#11). |
+| 1.12 | Gross weight kg | 330n | Required | Covered | `GrossWeightKg()` (#11). |
+| 1.13 | Net weight lb | 320n | Required | Covered | `NetWeightLb()` (#11). |
+| 1.14 | Gross weight lb | 340n | Required | Covered | `GrossWeightLb()` (#11). |
+| 1.15 | Count, up to 8 digits | 37 | Required | Covered | `CountOfTradeItems()` (#12). |
+| 1.16 | GLN, 12 digits + check | 414 | Required | Covered | Whole GLN family parses: 410–417, 254 and 7040 landed in #27 (closes #10). `ValidateGLN` and `ValidateCheckDigits` cover 410–417 (#7); `GLN()` accessor (#12). |
 | 1.17 | Customer part number | 241 | Required | Covered | |
 | 1.18 | Serial number | 21 | Required | Covered | `SerialNumber()`. |
-| 1.19 | GSIN, 16 digits + check | 402 | Required | Covered, check digit opt-in | `ValidateGSIN` and `ValidateCheckDigits` (#7); `GSIN()` accessor (#12). |
+| 1.19 | GSIN, 16 digits + check | 402 | Required | Covered | `ValidateGSIN` and `ValidateCheckDigits` (#7); `GSIN()` accessor (#12). |
 | 1.20 | Internal AIs 90–99 | 90–99 | Required | Covered | 90 is X..30, 91–99 are X..90. |
-| 1.21 | GDTI | 253 | Recommended | Covered, check digit opt-in | Landed in #32 (closes #8) with `GDTI()`. `ValidateCheckDigits` checks the 13-digit key prefix (#7). |
-| 1.22 | GRAI | 8003 | Recommended | Covered, check digit opt-in | Landed in #32 with `GRAI()`. `ValidateCheckDigits` checks the 13-digit key after the leading zero (#7). |
+| 1.21 | GDTI | 253 | Recommended | Covered | Landed in #32 (closes #8) with `GDTI()`. `ValidateCheckDigits` checks the 13-digit key prefix (#7). |
+| 1.22 | GRAI | 8003 | Recommended | Covered | Landed in #32 with `GRAI()`. `ValidateCheckDigits` checks the 13-digit key after the leading zero (#7). |
 | 1.23 | GIAI | 8004 | Recommended | Covered | Landed in #32. No check digit by specification. |
-| 1.24 | GSRN | 8018 | Recommended | Covered, check digit opt-in | 8017 and 8018 landed in #32. `ValidateGSRN` and `ValidateCheckDigits` (#7). |
+| 1.24 | GSRN | 8018 | Recommended | Covered | 8017 and 8018 landed in #32. `ValidateGSRN` and `ValidateCheckDigits` (#7). |
 | 1.25 | GINC | 401 | Recommended | Covered | Landed in #32. No check digit by specification. |
 
 Cross-cutting: the AI table is generated from the GS1 Barcode Syntax
 Dictionary release 2026-01-27 (541 AIs, #14), and the association rules are
 the dictionary's `req`/`ex` attributes evaluated for every AI (#13, #14). A
 newer dictionary release is a file replacement plus `make generate`.
+Check-digit validation is opt-in by design, through
+`ParseOptions.ValidateCheckDigits` or the `Validate*` helpers, so resilient
+parsing of noisy scanner output stays the default (ADR 0008, ADR 0010).
 
 ## 2. Symbologies
 
@@ -67,14 +70,14 @@ or without its AIM symbology identifier, and splits it correctly.
 
 | # | Item | Type | Status | Notes / issue |
 |---|---|---|---|---|
-| 2.1 | EAN-13 | Required | Covered, prefix gap | Bare 13 digits parse. `]E0` prefix is not recognised (#15). |
-| 2.2 | ITF-14 | Required | Gap | Bare 14 digits parse. `]I0` prefix is not recognised and the carrier is not reported (#15). |
+| 2.1 | EAN-13 | Required | Covered | Bare 13 digits and the `]E0` identifier parse; `Barcode.Symbology` reports `SymEANUPC` (#15). |
+| 2.2 | ITF-14 | Required | Covered | Bare 14 digits and the `]I0`, `]I1` and `]I2` identifiers parse; `Barcode.Symbology` reports `SymITF14` and a stripped check digit under `]I2` is recomputed (#15). |
 | 2.3 | GS1-128 with its AIs | Required | Covered | `]C1`, FNC1 as ASCII 29, missing-FNC1 recovery. |
 | 2.4 | GS1 DataMatrix with its AIs | Required | Covered | `]d1`, `]d2`. |
 | 2.5 | GS1 DataBar family | Required | Covered | `]e0`. Decodes to the same element string as GS1-128. |
-| 2.6 | EAN-8 | Required | Gap | See 1.4 and #15. |
-| 2.7 | UPC-A | Required | Covered, prefix gap | See 2.1. |
-| 2.8 | UPC-E | Required | Covered | `ExpandUPCE`. Automatic expansion under `]E0` in #15. |
+| 2.6 | EAN-8 | Required | Covered | `]E4` identifier, or bare input with `AssumeBareGTIN8`; see 1.4 (#15). |
+| 2.7 | UPC-A | Required | Covered | See 2.1. |
+| 2.8 | UPC-E | Required | Covered | `ExpandUPCE`; an eight-digit payload under `]E0` is expanded to UPC-A automatically (#15). |
 | 2.9 | GS1 QR Code | Recommended | Covered | `]Q3`. |
 | 2.10 | EPC / RFID tag | Recommended | Covered | `ParseEPC` and `ParseEPCURI` decode SGTIN-96/198, SSCC-96, SGLN-96/195, GRAI-96/170 and GIAI-96/202 into the equivalent element string (#19); CLI `gs1 epc`, WASM `parseEPC()`. Writing tags is out of scope. |
 
@@ -87,7 +90,7 @@ Printing symbols (checklist wording "impresión") is covered under 3.5 and track
 | 3.1 | Compatible with Wi-Fi data capture devices (mobile computers, not only tethered scanners) | Required | Application layer | The parser is transport-agnostic: HID text, TCP streams and HTTP posts all feed `ParseInto`. Documented in the integration guide (#20). |
 | 3.2 | Read and process AIs: split and store internally | Required | Covered | Elements in scan order, `Get`, typed accessors. Full AI table and association rules generated from the Syntax Dictionary (#13, #14). |
 | 3.3 | Separate and store each AI as its own field, e.g. (02) GTIN, (10) lot, (17) expiry, (37) count | Required | Covered | `Barcode.Elements` plus accessors. Dates return `time.Time`. |
-| 3.4 | Place, manage and interpret FNC1 after variable-length AIs | Required | Covered | Reading side complete. Writing side (placing FNC1 when building strings) is the encoder in #16. |
+| 3.4 | Place, manage and interpret FNC1 after variable-length AIs | Required | Covered | Reading side complete. Writing side covered by `Encode` and `EncodeZPL`, which place FNC1 after every variable-length AI that is not last (#16). |
 | 3.5 | Print, read and interpret 2D symbologies; print simple and logistic labels | Required | Gap, rendering only | Reading is covered. Building the element string with correct AI order, FNC1 placement, association rules and check digits, plus HRI text and ZPL `^FD` data, is covered by `Encode`, `EncodeZPL`, `gs1 encode` and WASM `encode()` (#16). Rendering GS1-128, GS1 DataMatrix, GS1 QR, EAN/UPC and ITF-14 symbols and the logistic label layout (ZPL, SVG, image) is #24, which proposes superseding the no-generation clause of ADR 0002. |
 | 3.6 | Samples and logistic labels validated with the local GS1 verifier | Required | Covered (data), print verification pending | Data conformance: `TestConformance` runs the GS1 Syntax Engine 1.4.1 and Syntax Dictionary 2026-01-27 vectors (#18), with documented divergences; `testdata/labels/` holds the logistic label element strings per carrier. Printed samples come from the renderers in #24 and are taken to the GS1 member organisation's verifier (ISO/IEC 15415/15416); reports are recorded in `testdata/labels/`. |
 
@@ -128,22 +131,23 @@ Reference implementations: GS1 XML 3.x schemas and EANCOM at
 
 | Section | Required rows | Covered | Gap | Application layer / out of scope |
 |---|---|---|---|---|
-| 1. Keys | 20 | 15 | 5 | 0 |
-| 2. Symbologies | 8 | 5 | 3 | 0 |
-| 3. Processing | 6 | 3 | 2 | 1 |
+| 1. Keys | 20 | 20 | 0 | 0 |
+| 2. Symbologies | 8 | 8 | 0 | 0 |
+| 3. Processing | 6 | 4 | 1 | 1 |
 | 4. Reports | 5 | 0 | 0 | 5 |
 | 5. EDI | 0 | 0 | 0 | all |
 
-Rows counted as "Covered" include those where only a convenience accessor or
-opt-in strictness is pending. Rows in "Gap" have a linked issue in the
-milestone. When every Required gap is closed and the conformance job in #18
-is green, the module side of the checklist is complete; the remaining rows
-are demonstrated by the application during the audit using the integration
-guide.
+Rows marked "Covered" are implemented and tested in this module. The one
+Required gap left is symbol rendering and the logistic label layout (3.5,
+#24), which also supplies the printed samples for 3.6. The conformance job
+(#18) is green and the CLI and WebAssembly bindings expose every covered
+feature (#21), so the module side of the checklist is complete once #24
+ships; the remaining rows are demonstrated by the application during the
+audit using the integration guide.
 
 ## Keeping this file current
 
-Last reviewed: 2026-09-23, after #27 merged. Update this file in the same pull request that closes an issue, so the matrix never lags the code.
+Last reviewed: 2026-10-27, after #51 merged. Update this file in the same pull request that closes an issue, so the matrix never lags the code.
 
 ## Working with the milestone
 
