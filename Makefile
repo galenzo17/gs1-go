@@ -2,7 +2,7 @@ GO      ?= go
 PKG     := ./...
 FUZZTIME ?= 30s
 
-.PHONY: all test race cover lint vet fuzz bench wasm build clean npm-check snapshot tidy-check generate check-generate conformance
+.PHONY: all test race cover lint vet fuzz bench verify-symbol wasm build clean npm-check snapshot tidy-check generate check-generate conformance
 
 all: vet lint test
 
@@ -27,6 +27,11 @@ fuzz:
 
 bench:
 	$(GO) test -run=^$$ -bench=. -benchmem .
+
+# verify-symbol renders the symbol package's output and decodes it with
+# zxing-cpp (through uv) outside the module; see symbol/testdata/verify-linear.sh.
+verify-symbol:
+	bash symbol/testdata/verify-linear.sh
 
 build:
 	$(GO) build -o gs1 ./cmd/gs1
