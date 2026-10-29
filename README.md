@@ -380,6 +380,12 @@ differs from the dictionary.
 | Bare GTIN (EAN-13, UPC-A, GTIN-14) | `7800038041425` → AI 01, zero-padded to 14 |
 | Bare GTIN-8 | Requires `ParseOptions{AssumeBareGTIN8: true}` |
 
+After scanner cleaning and recognized prefixes, a leading `(` selects
+bracket notation for the whole input. Raw element strings preserve literal
+parentheses in values: `10LOT(90)X` is one AI 10 with value `LOT(90)X`.
+Use FNC1 to separate variable-length raw fields, rather than switching to
+bracket notation partway through the input.
+
 GS1 DataBar needs no special handling: scanners decode it to the same
 element string as GS1-128.
 

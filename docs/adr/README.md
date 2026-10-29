@@ -18,3 +18,4 @@ supersedes it.
 | [0008](0008-check-digit-validation.md) | Opt-in GTIN check-digit validation | Accepted |
 | [0010](0010-key-check-digit-validation.md) | Check-digit validation for every numeric GS1 key | Accepted |
 | [0011](0011-generated-ai-table.md) | Generate the AI table and association rules from the GS1 Syntax Dictionary | Accepted |
+| [0012](0012-bracket-notation-detection.md) | Detect bracket notation at the start of the element string | Proposed |
