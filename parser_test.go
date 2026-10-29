@@ -775,6 +775,7 @@ func TestParseInto(t *testing.T) {
 		{"full barcode", "0104150000021126172506302112345ABC\x1D10LOT42X"},
 		{"GTIN only", "0104150000021126"},
 		{"lot only", "10ABC123"},
+		{"raw parentheses", "10LOT(90)X\x1D21S(1)"},
 		{"bracket notation", "(01)04150000021126(17)250630(10)LOT42"},
 		{"bare EAN-13", "7800038041425"},
 		{"AIM prefix", "]C10104150000021126"},
@@ -813,6 +814,7 @@ func TestParseIntoReuse(t *testing.T) {
 		"0104150000021126172506302112345ABC\x1D10LOT42X",
 		"0104150000021126",
 		"10BATCH42",
+		"10LOT(90)X\x1D21S(1)",
 		"(01)04150000021126(17)250630",
 		"7800038041425",
 	}

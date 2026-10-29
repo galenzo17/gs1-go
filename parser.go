@@ -245,6 +245,8 @@ func (b *Barcode) Reset() {
 // into a Barcode with typed elements. It handles AIM symbology identifiers
 // (e.g., ]C1, ]d2), FNC1 separators (ASCII 29), and bracket notation
 // (e.g., "(01)04150000021126(17)250630").
+// Bracket notation is selected when the first AI starts with "(" after
+// scanner cleaning and prefixes; parentheses in raw data are preserved.
 func Parse(input string) (Barcode, error) {
 	return ParseWithOptions(input, ParseOptions{})
 }
@@ -667,10 +669,14 @@ func isZeros(s string) bool {
 }
 
 // stripBracketNotation converts bracket notation "(01)0415...(17)250630"
-// to raw AI string with FNC1 separators between fields. If no brackets are
-// found, returns the input unchanged.
+// to raw AI string with FNC1 separators between fields. Only a leading
+// bracket after scanner prefixes selects this format for the whole input.
 func stripBracketNotation(input string) string {
-	if !strings.Contains(input, "(") {
+	pos, _, _ := skipPrefix(input)
+	for pos < len(input) && input[pos] == byte(fnc1) {
+		pos++
+	}
+	if pos >= len(input) || input[pos] != '(' {
 		return input
 	}
 	var b strings.Builder

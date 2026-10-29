@@ -21,6 +21,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   read back by a test-only decoder with fuzz targets, and `make
   verify-symbol` decodes rendered PNGs with zxing-cpp outside the module.
 
+### Fixed
+
+- Preserve literal parentheses in raw element-string values. Bracket
+  notation is detected only at the first AI after scanner cleaning and
+  prefixes, so `10LOT(90)X` retains the lot value `LOT(90)X`.
+
 ### Changed
 
 - Strict association validation applies the complete dictionary rules, so
