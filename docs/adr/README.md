@@ -16,6 +16,7 @@ supersedes it.
 | [0006](0006-missing-fnc1-recovery.md) | Missing FNC1 recovery heuristic | Accepted |
 | [0007](0007-date-parsing-options.md) | Configurable day-zero date policy | Accepted |
 | [0008](0008-check-digit-validation.md) | Opt-in GTIN check-digit validation | Accepted |
+| [0009](0009-symbol-generation.md) | Symbol generation in a `symbol` sub-package | Proposed |
 | [0010](0010-key-check-digit-validation.md) | Check-digit validation for every numeric GS1 key | Accepted |
 | [0011](0011-generated-ai-table.md) | Generate the AI table and association rules from the GS1 Syntax Dictionary | Accepted |
 | [0012](0012-bracket-notation-detection.md) | Detect bracket notation at the start of the element string | Proposed |
