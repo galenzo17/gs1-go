@@ -182,10 +182,12 @@ operator: it validates the check digit and reports every family the length
 admits, because GTIN-13 and GLN share 13 digits and SSCC and GSRN share 18.
 
 `ValidateCheckDigits` checks every numeric GS1 key in the element string:
-GTIN (AI 01 and 02, including bare GTINs and EAN/UPC and ITF-14 payloads
+GTIN (AI 01, 02 and 03, including bare GTINs and EAN/UPC and ITF-14 payloads
 normalized to AI 01), SSCC (00), GSIN (402), the GLN family (410–417), GSRN
-(8017, 8018) and the 13-digit key prefix of GDTI (253) and GRAI (8003). It
-is independent of `ValidateAssociations`:
+(8017, 8018), the 13-digit key of GDTI (253), GCN (255) and GRAI (8003), and
+the 14-digit GTIN prefix of ITIP (8006, 8026). Serial and piece/total
+components are excluded from the check digit. The option is independent of
+`ValidateAssociations`:
 
 | ValidateAssociations | ValidateCheckDigits | Semantic checks |
 |---|---|---|

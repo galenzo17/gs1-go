@@ -129,13 +129,13 @@ func ValidateKey(key string) ([]KeyType, error) {
 // validateElementCheckDigit validates the modulo-10 check digit carried by
 // an element whose AI identifies a numeric GS1 key. It covers every AI in
 // the table whose GS1 Syntax Dictionary entry carries the csum constraint:
-// GTIN (01, 02), SSCC (00), GSIN (402), the GLN family (410-417), GSRN
-// (8017, 8018), and the 13-digit numeric prefix of GDTI (253) and GRAI
-// (8003). Other AIs pass unchanged.
+// GTIN (01, 02, 03), SSCC (00), GSIN (402), the GLN family (410-417), GSRN
+// (8017, 8018), the 13-digit key of GDTI (253), GCN (255) and GRAI (8003),
+// and the 14-digit GTIN prefix of ITIP (8006, 8026). Other AIs pass unchanged.
 func validateElementCheckDigit(element Element) error {
 	var err error
 	switch element.AI {
-	case "01", "02":
+	case "01", "02", "03":
 		err = ValidateGTIN(element.Value)
 	case "00":
 		err = ValidateSSCC(element.Value)
@@ -145,10 +145,12 @@ func validateElementCheckDigit(element Element) error {
 		err = ValidateGLN(element.Value)
 	case "8017", "8018":
 		err = ValidateGSRN(element.Value)
-	case "253":
+	case "253", "255":
 		err = validateKeyPrefix(element.Value, 0, 13)
 	case "8003":
 		err = validateKeyPrefix(element.Value, 1, 14)
+	case "8006", "8026":
+		err = validateKeyPrefix(element.Value, 0, 14)
 	default:
 		return nil
 	}

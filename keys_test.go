@@ -2,6 +2,7 @@ package gs1
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -182,6 +183,15 @@ func TestParseCheckDigitsForKeyAIs(t *testing.T) {
 		invalid string
 	}{
 		{name: "SSCC (00)", valid: "00106141411234567897", invalid: "00106141411234567891"},
+		{name: "MTO GTIN (03)", valid: "0312345678901231", invalid: "0312345678901232"},
+		{name: "GCN (255)", valid: "2551234567890128", invalid: "2551234567890129"},
+		{name: "GCN (255) one-digit serial", valid: "25512345678901280", invalid: "25512345678901290"},
+		{name: "GCN (255) non-zero one-digit serial", valid: "25512345678901281", invalid: "25512345678901291"},
+		{name: "GCN (255) twelve-digit serial", valid: "2551234567890128123456789012", invalid: "2551234567890129123456789012"},
+		{name: "ITIP (8006)", valid: "8006123456789012310102", invalid: "8006123456789012320102"},
+		{name: "ITIP (8006) second piece", valid: "8006123456789012310202", invalid: "8006123456789012320202"},
+		{name: "ITIP CONTENT (8026)", valid: "8026123456789012310102", invalid: "8026123456789012320102"},
+		{name: "ITIP CONTENT (8026) second piece", valid: "8026123456789012310202", invalid: "8026123456789012320202"},
 		{name: "GSIN (402)", valid: "40206141410000000012", invalid: "40206141410000000013"},
 		{name: "GLN (410)", valid: "4100614141000012", invalid: "4100614141000013"},
 		{name: "GLN (411)", valid: "4110614141000012", invalid: "4110614141000013"},
@@ -247,6 +257,18 @@ func TestValidateRejectsShortKeyPrefixes(t *testing.T) {
 	}{
 		{name: "short GDTI", elements: []Element{{AI: "253", Value: "123"}}, wantErr: ErrInvalidData},
 		{name: "short GRAI", elements: []Element{{AI: "8003", Value: "0123"}}, wantErr: ErrInvalidData},
+		{name: "short MTO GTIN", elements: []Element{{AI: "03", Value: "123"}}, wantErr: ErrInvalidData},
+		{name: "short GCN key", elements: []Element{{AI: "255", Value: "123456789012"}}, wantErr: ErrInvalidData},
+		{name: "short ITIP key", elements: []Element{{AI: "8006", Value: "1234567890128"}}, wantErr: ErrInvalidData},
+		{
+			name: "short ITIP CONTENT key",
+			elements: []Element{
+				{AI: "00", Value: "106141411234567897"},
+				{AI: "8026", Value: "1234567890128"},
+				{AI: "37", Value: "2"},
+			},
+			wantErr: ErrInvalidData,
+		},
 		{name: "short SSCC", elements: []Element{{AI: "00", Value: "123"}}, wantErr: ErrInvalidData},
 		{name: "GDTI key only", elements: []Element{{AI: "253", Value: "0614141000012"}}},
 		{name: "GRAI key only", elements: []Element{{AI: "8003", Value: "00614141000012"}}},
@@ -301,5 +323,111 @@ func TestEncodeValidatesKeyCheckDigits(t *testing.T) {
 				t.Errorf("round trip = %+v, want %+v", parsed.Elements, tt.element)
 			}
 		})
+	}
+}
+
+func TestAdditionalKeyValidationEntryPoints(t *testing.T) {
+	tests := []struct {
+		ai         string
+		valid      string
+		invalid    string
+		companions []Element
+	}{
+		{ai: "03", valid: "12345678901231", invalid: "12345678901232"},
+		{ai: "255", valid: "1234567890128123456789012", invalid: "1234567890129123456789012"},
+		{ai: "8006", valid: "123456789012310202", invalid: "123456789012320202"},
+		{
+			ai: "8026", valid: "123456789012310202", invalid: "123456789012320202",
+			companions: []Element{{AI: "00", Value: "106141411234567897"}, {AI: "37", Value: "2"}},
+		},
+	}
+	options := []struct {
+		name string
+		opts ParseOptions
+	}{
+		{name: "default"},
+		{name: "associations", opts: ParseOptions{ValidateAssociations: true}},
+		{name: "check digits", opts: ParseOptions{ValidateCheckDigits: true}},
+		{name: "both", opts: ParseOptions{ValidateAssociations: true, ValidateCheckDigits: true}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.ai, func(t *testing.T) {
+			var reused Barcode
+			for _, step := range []struct {
+				value   string
+				wantErr error
+			}{
+				{value: tt.valid},
+				{value: tt.invalid, wantErr: ErrInvalidCheckDigit},
+				{value: tt.valid},
+			} {
+				elements := append([]Element{{AI: tt.ai, Value: step.value}}, tt.companions...)
+				barcode := Barcode{Elements: elements}
+				if err := barcode.ValidateAssociations(); err != nil {
+					t.Fatalf("fixture associations error = %v", err)
+				}
+				if err := barcode.Validate(); !errors.Is(err, step.wantErr) {
+					t.Errorf("Validate(%q) error = %v, want %v", step.value, err, step.wantErr)
+				}
+				if _, err := Encode(elements); !errors.Is(err, step.wantErr) {
+					t.Errorf("Encode(%q) error = %v, want %v", step.value, err, step.wantErr)
+				}
+				input := barcode.HRI()
+				for _, option := range options {
+					var wantErr error
+					if option.opts.ValidateCheckDigits {
+						wantErr = step.wantErr
+					}
+					got, err := ParseWithOptions(input, option.opts)
+					if !errors.Is(err, wantErr) {
+						t.Fatalf("ParseWithOptions(%q, %s) error = %v, want %v", input, option.name, err, wantErr)
+					}
+					reused.Reset()
+					intoErr := ParseIntoWithOptions(input, &reused, option.opts)
+					if !errors.Is(intoErr, wantErr) {
+						t.Fatalf("ParseIntoWithOptions(%q, %s) error = %v, want %v", input, option.name, intoErr, wantErr)
+					}
+					if wantErr == nil && (got.Raw != input || reused.Raw != input ||
+						!slices.Equal(got.Elements, elements) || !slices.Equal(reused.Elements, elements)) {
+						t.Errorf("%s parsing did not preserve elements %+v", option.name, elements)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestAdditionalKeyCheckDigitErrorPrecedence(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		opts    ParseOptions
+		wantErr error
+	}{
+		{name: "syntax before check digit", input: "0312345678901232XX", wantErr: ErrUnknownAI},
+		{name: "length before check digit", input: "03123456789012321712", wantErr: ErrTruncatedData},
+		{name: "data type before check digit", input: "031234567890123230X", wantErr: ErrInvalidData},
+		{
+			name: "associations before check digit", input: "8026123456789012320102",
+			opts: ParseOptions{ValidateAssociations: true}, wantErr: ErrInvalidAssociation,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.opts.ValidateCheckDigits = true
+			_, err := ParseWithOptions(tt.input, tt.opts)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("ParseWithOptions() error = %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+	_, err := ParseWithOptions("10LOT\x1D031234567890123200106141411234567891", ParseOptions{ValidateCheckDigits: true})
+	if !errors.Is(err, ErrInvalidCheckDigit) {
+		t.Fatalf("error = %v, want ErrInvalidCheckDigit", err)
+	}
+	for _, want := range []string{"position 6", "AI (03)", "expected '1', got '2'"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q lacks %q", err, want)
+		}
 	}
 }
