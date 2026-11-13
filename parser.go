@@ -103,11 +103,11 @@ type ParseOptions struct {
 	// ValidateAssociations enforces AI association rules after parsing.
 	ValidateAssociations bool
 	// ValidateCheckDigits checks the modulo-10 check digit of every numeric
-	// GS1 key in the element string: GTIN (01, 02, including bare GTINs and
+	// GS1 key in the element string: GTIN (01, 02, 03, including bare GTINs and
 	// EAN/UPC and ITF-14 carrier payloads), SSCC (00), GSIN (402), the GLN
 	// family (410-417), GSRN (8017, 8018) and the numeric prefix of GDTI
-	// (253) and GRAI (8003). It is independent of ValidateAssociations and
-	// is disabled by default.
+	// (253), GCN (255) and GRAI (8003), plus the GTIN prefix of ITIP (8006,
+	// 8026). It is independent of ValidateAssociations and is disabled by default.
 	ValidateCheckDigits bool
 }
 

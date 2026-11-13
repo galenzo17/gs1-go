@@ -9,6 +9,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+- Apply check-digit validation to AI 03, the 13-digit GCN key in AI 255,
+  and the 14-digit GTIN prefix in AI 8006 and AI 8026. Strict parsing,
+  `Barcode.Validate` and encoding now reject incorrect check digits for
+  these AIs; serial and piece/total components remain outside the checksum.
 - Preserve literal parentheses in raw element-string values. Bracket
   notation is detected only at the first AI after scanner cleaning and
   prefixes, so `10LOT(90)X` retains the lot value `LOT(90)X`.
