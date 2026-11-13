@@ -678,7 +678,7 @@ func TestValidateAssociations(t *testing.T) {
 	for _, valid := range []Barcode{
 		{Elements: []Element{sscc}},
 		{Elements: []Element{sscc, {AI: "02", Value: "04150000021126"}, {AI: "37"}}},
-		{Elements: []Element{sscc, {AI: "8026"}, {AI: "37"}}},
+		{Elements: []Element{sscc, {AI: "8026", Value: "123456789012310102"}, {AI: "37"}}},
 		{Elements: []Element{{AI: "01", Value: "04150000021126"}, {AI: "21"}}},
 		{Elements: []Element{{AI: "01", Value: "04150000021126"}, {AI: "3102"}}},
 		{Elements: []Element{sscc, {AI: "3302"}}},
