@@ -7,8 +7,26 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+
+- `symbol` package: EAN-13, EAN-8, UPC-A and UPC-E (ISO/IEC 15420) and
+  ITF-14 (ISO/IEC 16390) symbols from a GTIN, with no new dependencies.
+  `EAN13`, `EAN8`, `UPCA`, `UPCE` and `ITF14` validate the check digit (and
+  the UPC-E zero-suppression rules) and return a `Linear` that carries the
+  bar pattern and the GS1 layout: nominal bar heights, extended guard bars,
+  ITF-14 bearer bars (horizontal, frame or none), the minimum quiet zones
+  and the HRI digits drawn with built-in glyphs. `Image`, `PNG` and `SVG`
+  render it at a chosen number of pixels per module and `Size` reports the
+  result. Every symbol is compared module for module with zint golden data,
+  read back by a test-only decoder with fuzz targets, and `make
+  verify-symbol` decodes rendered PNGs with zxing-cpp outside the module.
+
 ### Fixed
 
+- Apply check-digit validation to AI 03, the 13-digit GCN key in AI 255,
+  and the 14-digit GTIN prefix in AI 8006 and AI 8026. Strict parsing,
+  `Barcode.Validate` and encoding now reject incorrect check digits for
+  these AIs; serial and piece/total components remain outside the checksum.
 - Preserve literal parentheses in raw element-string values. Bracket
   notation is detected only at the first AI after scanner cleaning and
   prefixes, so `10LOT(90)X` retains the lot value `LOT(90)X`.

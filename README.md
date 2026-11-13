@@ -43,6 +43,9 @@ b.GSIN() // "12345678901234567"
   association and check-digit enforcement, ZPL `^FD` output, and
   human-readable interpretation through `Barcode.HRI()`.
 - **Carrier detection** through `Barcode.Symbology`, including EAN/UPC and ITF-14.
+- **Symbol rendering** of EAN-13, EAN-8, UPC-A, UPC-E and ITF-14 from a GTIN
+  in the `symbol` package: PNG, `image.Gray` or SVG with the GS1 nominal
+  layout, guard and bearer bars, quiet zones and HRI digits.
 - **Scanner resilience by default.** UTF-8 BOM, CR/LF, NUL bytes and
   duplicated FNC1 from keyboard-wedge and USB HID scanners are normalized
   before parsing. See [ADR 0003](docs/adr/0003-scanner-resilience.md).
@@ -182,10 +185,12 @@ operator: it validates the check digit and reports every family the length
 admits, because GTIN-13 and GLN share 13 digits and SSCC and GSRN share 18.
 
 `ValidateCheckDigits` checks every numeric GS1 key in the element string:
-GTIN (AI 01 and 02, including bare GTINs and EAN/UPC and ITF-14 payloads
+GTIN (AI 01, 02 and 03, including bare GTINs and EAN/UPC and ITF-14 payloads
 normalized to AI 01), SSCC (00), GSIN (402), the GLN family (410–417), GSRN
-(8017, 8018) and the 13-digit key prefix of GDTI (253) and GRAI (8003). It
-is independent of `ValidateAssociations`:
+(8017, 8018), the 13-digit key of GDTI (253), GCN (255) and GRAI (8003), and
+the 14-digit GTIN prefix of ITIP (8006, 8026). Serial and piece/total
+components are excluded from the check digit. The option is independent of
+`ValidateAssociations`:
 
 | ValidateAssociations | ValidateCheckDigits | Semantic checks |
 |---|---|---|
@@ -508,11 +513,13 @@ agree, so the rate reported in CI moves only deliberately.
 
 ## Scope
 
-This library is a parsing and validation layer. It does not generate
-barcodes, verify print quality, resolve GS1 Digital Link URIs, or implement
+This library is a parsing and validation layer with, since the `symbol`
+package, the rendering of the retail and logistic linear symbols (EAN/UPC and
+ITF-14); GS1 DataMatrix and GS1-128 rendering is in progress under #24. It
+does not verify print quality, resolve GS1 Digital Link URIs, or implement
 business documents such as dispatch advices. See
-[ADR 0002](docs/adr/0002-parser-scope.md) for the reasoning and the GS1
-resources that cover those areas.
+[ADR 0002](docs/adr/0002-parser-scope.md) for the reasoning behind the
+parser scope and the GS1 resources that cover those areas.
 
 For guidance on connecting scanner transports, storing parsed fields, and
 mapping records into dispatch advice workflows, see the
